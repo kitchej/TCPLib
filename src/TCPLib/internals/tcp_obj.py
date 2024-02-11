@@ -69,6 +69,10 @@ class TCPObj(abc.ABC):
             self._soc.sendall(msg)
             logging.debug(f"Sent msg to {self._addr[0]} @ {self._addr[1]}")
             return True
+        except ConnectionAbortedError:
+            logging.exception(f"Exception occurred while receiving from {self._addr[0]} @ {self._addr[1]}")
+            self._is_connected = False
+            return ()
         except ConnectionError:
             logging.exception(f"Exception occurred while receiving from {self._addr[0]} @ {self._addr[1]}")
             self.disconnect(warn=False)
@@ -94,6 +98,10 @@ class TCPObj(abc.ABC):
                 chunk_len = len(chunk)
                 if chunk_len < buff_size:
                     buff_size = chunk_len
+        except ConnectionAbortedError:
+            logging.exception(f"Exception occurred while receiving from {self._addr[0]} @ {self._addr[1]}")
+            self._is_connected = False
+            return ()
         except ConnectionError:
             logging.exception(f"Exception occurred while receiving from {self._addr[0]} @ {self._addr[1]}")
             self._is_connected = False

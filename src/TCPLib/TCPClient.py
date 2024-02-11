@@ -1,6 +1,7 @@
 import logging
+import socket
 
-import internals.tcp_obj as tcp_obj
+import TCPLib.internals.tcp_obj as tcp_obj
 
 
 # Bindings for log levels, so the user doesn't have to import the logging module for one parameter
@@ -17,13 +18,47 @@ class TCPClient(tcp_obj.TCPObj):
                             datefmt="%m/%d/%Y %I:%M:%S %p")
 
     def send(self, data: bytes):
-        pass
+        if self.send_bytes(data, tcp_obj.DATA):
+            return self.receive_bytes()
 
     def receive(self):
-        pass
+        size, flags, data = self.receive_bytes()
+        reply = len(data).to_bytes(4, byteorder="little")
+        self.send_bytes(reply, tcp_obj.COUNT)
 
-    def connect(self, addr: str, port: int):
-        pass
+        return size, flags, data
+
+    def connect(self, host: str, port: int):
+        self._addr = (host, port)
+        self._soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._soc.settimeout(self._timeout)
+        logging.info(f"Connecting to {self._addr[0]} @ {self._addr[1]}")
+
+        try:
+            self._soc.connect(self._addr)
+        except TimeoutError as e:
+            self.disconnect(warn=False)
+            logging.debug("Connection timed out")
+            return e
+        except ConnectionError as e:
+            self.disconnect(warn=False)
+            logging.debug("Connection was lost")
+            return e
+        except socket.gaierror as e:
+            self.disconnect(warn=False)
+            logging.exception("Could not connect")
+            return e
+        self._is_connected = True
+        logging.info(f"Connected to {self._addr[0]} @ {self._addr[1]}")
 
     def disconnect(self, warn=True):
-        pass
+        if self._is_connected:
+            if warn:
+                self.send_bytes(b'', tcp_obj.DISCONNECT)
+            self._soc.close()
+            logging.info(f"Disconnected from host {self._addr[0]} @ {self._addr[1]}")
+            self._soc = None
+            self._is_connected = False
+            return True
+
+        return False
