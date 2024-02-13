@@ -1,5 +1,6 @@
 import abc
 import logging
+import threading
 
 logging.getLogger(__name__)
 
@@ -10,13 +11,18 @@ DISCONNECT = 4
 
 
 class TCPObj(abc.ABC):
-    '''Abstract base class defining a send/receive interface'''
+    '''Abstract base class defining a TCP send/receive interface'''
     def __init__(self, host, port, buff_size=4096):
         self._addr = (host, port)
         self._timeout = None
         self._buff_size = buff_size
         self._is_connected = False
         self._soc = None
+        self._new_data = [
+            False,  # True = New data; False = No new data; None = Done receiving
+            0       # Size of incoming data
+        ]
+        self._new_data_lock = threading.Lock()
 
     @staticmethod
     def encode_msg(data: bytes, flags: int):
@@ -54,6 +60,14 @@ class TCPObj(abc.ABC):
     def addr(self):
         return self._addr
 
+    def query_progress(self):
+        self._new_data_lock.acquire()
+        result = self._new_data
+        if self._new_data[0]:
+            self._new_data[0] = False
+        self._new_data_lock.release()
+        return result
+
     @abc.abstractmethod
     def disconnect(self, warn=True):
         '''
@@ -90,10 +104,16 @@ class TCPObj(abc.ABC):
         try:
             header = self._soc.recv(5)
             size, flags = self.decode_header(header)
+            self._new_data_lock.acquire()
+            self._new_data[1] = size
+            self._new_data_lock.release()
             if size < buff_size:
                 buff_size = size
             while len(data) < size:
                 chunk = self._soc.recv(buff_size)
+                self._new_data_lock.acquire()
+                self._new_data[0] = True
+                self._new_data_lock.release()
                 data.extend(chunk)
                 chunk_len = len(chunk)
                 if chunk_len < buff_size:
@@ -113,4 +133,7 @@ class TCPObj(abc.ABC):
         except AttributeError:  # Socket was closed from another thread
             return ()
 
+        self._new_data_lock.acquire()
+        self._new_data[0] = None
+        self._new_data_lock.release()
         return size, flags, data

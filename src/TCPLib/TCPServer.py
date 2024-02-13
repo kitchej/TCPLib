@@ -143,7 +143,12 @@ class TCPServer:
             self._connected_clients_lock.release()
             return False
         self._connected_clients_lock.release()
-        return client.send(data)
+        reply = client.send(data)
+        if not reply:
+            return reply
+        else:
+            return reply[0], reply[1], int.from_bytes(reply[2], byteorder="little")
+
 
     def start(self):
         if self._is_running:

@@ -19,7 +19,8 @@ class TCPClient(tcp_obj.TCPObj):
 
     def send(self, data: bytes):
         if self.send_bytes(data, tcp_obj.DATA):
-            return self.receive_bytes()
+            reply = self.receive_bytes()
+            return reply[0], reply[1], int.from_bytes(reply[2], byteorder="little")
 
     def receive(self):
         size, flags, data = self.receive_bytes()
