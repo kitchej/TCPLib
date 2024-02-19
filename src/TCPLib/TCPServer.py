@@ -2,8 +2,8 @@ import logging
 import threading
 import queue
 
-from TCPLib.internals.listener import Listener
-from TCPLib.internals.client_processor import ClientProcessor
+from internals.listener import Listener
+from internals.client_processor import ClientProcessor
 
 # Bindings for log levels, so the user doesn't have to import the logging module for one parameter
 
@@ -12,9 +12,9 @@ DEBUG = logging.DEBUG
 
 
 class TCPServer:
-    def __init__(self, host, port, max_clients=0, buff_size=4096, timeout=None, logging_level=INFO, log_path=".server_log.txt"):
+    '''Class for creating, maintaining, and transmitting data to multiple client connections.'''
+    def __init__(self, host, port, max_clients=0, timeout=None, logging_level=INFO, log_path=".server_log.txt"):
         self._max_clients = max_clients
-        self._buff_size = buff_size
         self._connected_clients = {}
         self._connected_clients_lock = threading.Lock()
         self._messages = queue.Queue()
@@ -112,6 +112,12 @@ class TCPServer:
             "buff_size": client.buff_size(),
         }
 
+    def query_progress(self, client_id):
+        client = self._get_client(client_id)
+        if not client:
+            return
+        return client.query_progress()
+
     def disconnect_client(self, client_id: str, warn=True):
         self._connected_clients_lock.acquire()
         try:
@@ -131,9 +137,9 @@ class TCPServer:
         except queue.Empty:
             return None
 
-    def get_all_msg(self):
+    def get_all_msg(self, block=False):
         while not self._messages.empty():
-            yield self.pop_msg()
+            yield self.pop_msg(block=block)
 
     def send(self, client_id: str, data: bytes):
         self._connected_clients_lock.acquire()
@@ -147,8 +153,7 @@ class TCPServer:
         if not reply:
             return reply
         else:
-            return reply[0], reply[1], int.from_bytes(reply[2], byteorder="little")
-
+            return reply[0], reply[1], int.from_bytes(reply[2], byteorder='big')
 
     def start(self):
         if self._is_running:

@@ -37,8 +37,8 @@ def test_send_text(server, client):
     server_reply, client_reply, msg = echo(client, server, text)
     time.sleep(0.1)
 
-    assert server_reply == (4, 1, len(text).to_bytes(4, byteorder='little'))
-    assert client_reply == (4, 1, len(text).to_bytes(4, byteorder='little'))
+    assert server_reply == (4, 1, len(text))
+    assert client_reply == (4, 1, len(text))
 
     assert msg["size"] == len(text)
     assert msg["flags"] == 2
@@ -54,8 +54,8 @@ def test_send_photo(server, client):
     server_reply, client_reply, msg = echo(client, server, photo)
     time.sleep(0.1)
 
-    assert server_reply == (4, 1, len(photo).to_bytes(4, byteorder='little'))
-    assert client_reply == (4, 1, len(photo).to_bytes(4, byteorder='little'))
+    assert server_reply == (4, 1, len(photo))
+    assert client_reply == (4, 1, len(photo))
 
     assert msg["size"] == len(photo)
     assert msg["flags"] == 2
@@ -78,8 +78,8 @@ def test_send_video(server, client):
     server_reply, client_reply, msg = echo(client, server, video)
     time.sleep(0.1)
 
-    assert server_reply == (4, 1, len(video).to_bytes(4, byteorder='little'))
-    assert client_reply == (4, 1, len(video).to_bytes(4, byteorder='little'))
+    assert server_reply == (4, 1, len(video))
+    assert client_reply == (4, 1, len(video))
 
     assert msg["size"] == len(video)
     assert msg["flags"] == 2

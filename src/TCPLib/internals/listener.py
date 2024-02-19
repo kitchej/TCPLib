@@ -8,6 +8,7 @@ logging.getLogger(__name__)
 
 
 class Listener:
+    '''Listens for and accepts new client connections for the server'''
     def __init__(self, host, port, server_obj, timeout=None):
         self._addr = (host, port)
         self._soc = None

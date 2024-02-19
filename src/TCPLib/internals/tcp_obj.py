@@ -1,5 +1,6 @@
 import abc
 import logging
+import queue
 import threading
 
 logging.getLogger(__name__)
@@ -10,25 +11,50 @@ DATA = 2
 DISCONNECT = 4
 
 
+class ChunkInfo:
+    def __init__(self, chunk_size, total_size):
+        self.chunk_size = chunk_size
+        self.total_size = total_size
+
+
 class TCPObj(abc.ABC):
     '''Abstract base class defining a TCP send/receive interface'''
-    def __init__(self, host, port, buff_size=4096):
+    def __init__(self, host, port):
         self._addr = (host, port)
         self._timeout = None
-        self._buff_size = buff_size
         self._is_connected = False
         self._soc = None
-        self._new_data = [
-            False,  # True = New data; False = No new data; None = Done receiving
-            0       # Size of incoming data
-        ]
-        self._new_data_lock = threading.Lock()
+        self._recv_ended = False
+        self._recv_ended_lock = threading.Lock()
+        self._chunks = queue.Queue()
+
+    def _clean_up(self):
+        logging.exception(f"Exception occurred while receiving from {self._addr[0]} @ {self._addr[1]}")
+        self.disconnect(warn=False)
+        self._is_connected = False
 
     @staticmethod
     def encode_msg(data: bytes, flags: int):
+        '''
+        MSG STRUCTURE:
+        [Header: 5 bytes] [Data: inf bytes]
+
+        HEADER STRUCTURE:
+        [Size: 4 bytes] [Flags: 1 Byte ->
+                                         1 ----
+                                         1     |
+                                         1     | --- CURRENTLY UNUSED
+                                         1     |
+                                         1 ____
+                                         1: DISCONNECTING
+                                         1: TRANSMITTING DATA
+                                         1: REPORTING BYTES RECEIVED
+                        ]
+
+        '''
         msg = bytearray()
-        size = len(data).to_bytes(4, byteorder='little')
-        flags = flags.to_bytes(1, byteorder='little')
+        size = len(data).to_bytes(4, byteorder='big')
+        flags = flags.to_bytes(1, byteorder='big')
         msg.extend(size)
         msg.extend(flags)
         msg.extend(data)
@@ -36,18 +62,12 @@ class TCPObj(abc.ABC):
 
     @staticmethod
     def decode_header(header: bytes):
-        size = int.from_bytes(header[0:4], byteorder="little")
-        flags = int.from_bytes(header[4:5], byteorder="little")
+        size = int.from_bytes(header[0:4], byteorder='big')
+        flags = int.from_bytes(header[4:5], byteorder='big')
         return size, flags
 
     def is_connected(self):
         return self._is_connected
-
-    def buff_size(self):
-        return self._buff_size
-
-    def set_buff_size(self, size: int):
-        self._buff_size = size
 
     def timeout(self):
         return self._timeout
@@ -61,12 +81,16 @@ class TCPObj(abc.ABC):
         return self._addr
 
     def query_progress(self):
-        self._new_data_lock.acquire()
-        result = self._new_data
-        if self._new_data[0]:
-            self._new_data[0] = False
-        self._new_data_lock.release()
-        return result
+        self._recv_ended_lock.acquire()
+        ended = self._recv_ended
+        self._recv_ended_lock.release()
+        if not ended:
+            yield self._chunks.get(block=True)
+        else:
+            if self._chunks.empty():
+                yield from None
+            else:
+                yield self._chunks.get()
 
     @abc.abstractmethod
     def disconnect(self, warn=True):
@@ -77,63 +101,78 @@ class TCPObj(abc.ABC):
         '''
         pass
 
-    def send_bytes(self, data: bytes, flags: int):
-        msg = self.encode_msg(data, flags)
+    def send_bytes(self, data: bytes):
+
         try:
-            self._soc.sendall(msg)
+            self._soc.sendall(data)
             logging.debug(f"Sent msg to {self._addr[0]} @ {self._addr[1]}")
             return True
         except ConnectionAbortedError:
-            logging.exception(f"Exception occurred while receiving from {self._addr[0]} @ {self._addr[1]}")
-            self._is_connected = False
-            return ()
+            self._clean_up()
+            return False
         except ConnectionError:
-            logging.exception(f"Exception occurred while receiving from {self._addr[0]} @ {self._addr[1]}")
-            self.disconnect(warn=False)
+            self._clean_up()
             return False
         except OSError:
-            logging.exception(f"Exception occurred while receiving from {self._addr[0]} @ {self._addr[1]}")
-            self.disconnect(warn=False)
+            self._clean_up()
             return False
         except AttributeError:  # Socket was closed from another thread
+            self._clean_up()
             return False
 
-    def receive_bytes(self):
-        buff_size = self._buff_size
-        data = bytearray()
+    def receive_bytes(self, size: int):
         try:
-            header = self._soc.recv(5)
-            size, flags = self.decode_header(header)
-            self._new_data_lock.acquire()
-            self._new_data[1] = size
-            self._new_data_lock.release()
-            if size < buff_size:
-                buff_size = size
-            while len(data) < size:
-                chunk = self._soc.recv(buff_size)
-                self._new_data_lock.acquire()
-                self._new_data[0] = True
-                self._new_data_lock.release()
-                data.extend(chunk)
-                chunk_len = len(chunk)
-                if chunk_len < buff_size:
-                    buff_size = chunk_len
+            return self._soc.recv(size)
         except ConnectionAbortedError:
-            logging.exception(f"Exception occurred while receiving from {self._addr[0]} @ {self._addr[1]}")
-            self._is_connected = False
-            return ()
+            self._clean_up()
+            return
         except ConnectionError:
-            logging.exception(f"Exception occurred while receiving from {self._addr[0]} @ {self._addr[1]}")
-            self._is_connected = False
-            return ()
+            self._clean_up()
+            return
         except OSError:
-            self._is_connected = False
-            logging.exception(f"Exception occurred while receiving from {self._addr[0]} @ {self._addr[1]}")
-            return ()
+            self._clean_up()
+            return
         except AttributeError:  # Socket was closed from another thread
-            return ()
+            self._clean_up()
+            return
 
-        self._new_data_lock.acquire()
-        self._new_data[0] = None
-        self._new_data_lock.release()
-        return size, flags, data
+
+    # def receive_bytes(self):
+    #     buff_size = self._buff_size
+    #     data = bytearray()
+    #     self._recv_ended_lock.acquire()
+    #     self._recv_ended = False
+    #     self._recv_ended_lock.release()
+    #     try:
+    #         header = self._soc.recv(5)
+    #         size, flags = self.decode_header(header)
+    #
+    #         if size < buff_size:
+    #             buff_size = size
+    #         while len(data) < size:
+    #             chunk = self._soc.recv(buff_size)
+    #             data.extend(chunk)
+    #             chunk_len = len(chunk)
+    #             if chunk_len < buff_size:
+    #                 buff_size = chunk_len
+    #
+    #             self._chunks.put(ChunkInfo(chunk_len, size))
+    #
+    #     except ConnectionAbortedError:
+    #         self._clean_up()
+    #         return ()
+    #     except ConnectionError:
+    #         self._clean_up()
+    #         return ()
+    #     except OSError:
+    #         self._clean_up()
+    #         return ()
+    #     except AttributeError:  # Socket was closed from another thread
+    #         self._clean_up()
+    #         return ()
+    #
+    #     self._recv_ended_lock.acquire()
+    #     self._recv_ended = True
+    #     self._recv_ended_lock.release()
+    #
+    #     return size, flags, data

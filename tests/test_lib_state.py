@@ -79,14 +79,12 @@ def test_server_state(dummy_client, server):
     assert server.addr() == (HOST, PORT)
     assert server.is_running() is False
     assert server._listener._soc is None
-    assert server.default_buff_size() == 4096
 
 
 def test_client_state(dummy_server, client):
     assert client.timeout() is None
-    assert client.buff_size() == 4096
     assert client.is_connected() is False
-    assert client.query_progress() is False
+    assert client.query_progress().new_data_recv is False
 
     client.connect(HOST, PORT)
     time.sleep(0.1)
