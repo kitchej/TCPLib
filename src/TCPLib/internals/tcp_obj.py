@@ -1,3 +1,8 @@
+"""
+tcp_obj.py
+Written by: Joshua Kitchen - 2024
+"""
+
 import abc
 import logging
 import queue
@@ -102,7 +107,6 @@ class TCPObj(abc.ABC):
         pass
 
     def send_bytes(self, data: bytes):
-
         try:
             self._soc.sendall(data)
             logging.debug(f"Sent msg to {self._addr[0]} @ {self._addr[1]}")

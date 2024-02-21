@@ -1,9 +1,14 @@
+"""
+TCPServer.py
+Written by: Joshua Kitchen - 2024
+"""
+
 import logging
 import threading
 import queue
 
-from internals.listener import Listener
-from internals.client_processor import ClientProcessor
+from TCPLib.internals.listener import Listener
+from TCPLib.internals.client_processor import ClientProcessor
 
 # Bindings for log levels, so the user doesn't have to import the logging module for one parameter
 
@@ -69,15 +74,6 @@ class TCPServer:
 
     def set_max_clients(self, new_max: int):
         self._max_clients = new_max
-
-    def default_buff_size(self):
-        return self._buff_size
-
-    def set_default_buff_size(self, new_size):
-        self._buff_size = new_size
-        if self.client_count() != 0:
-            for client_id in self.list_clients():
-                self.edit_client_prop(client_id, buff_size=new_size)
 
     def set_listener_timeout(self, timeout):
         self._listener.set_timeout(timeout)
@@ -149,11 +145,7 @@ class TCPServer:
             self._connected_clients_lock.release()
             return False
         self._connected_clients_lock.release()
-        reply = client.send(data)
-        if not reply:
-            return reply
-        else:
-            return reply[0], reply[1], int.from_bytes(reply[2], byteorder='big')
+        return client.send(data)
 
     def start(self):
         if self._is_running:

@@ -1,7 +1,12 @@
+"""
+TCPClient.py
+Written by: Joshua Kitchen - 2024
+"""
+
 import logging
 import socket
 
-import internals.tcp_obj as tcp_obj
+import TCPLib.internals.tcp_obj as tcp_obj
 
 
 # Bindings for log levels, so the user doesn't have to import the logging module for one parameter
@@ -31,7 +36,7 @@ class TCPClient(tcp_obj.TCPObj):
             yield from None
 
         while bytes_recv < size:
-            data = self._soc.recv(buff_size)
+            data = self.receive_bytes(buff_size)
             if not data:
                 yield from None
             bytes_recv += len(data)
@@ -39,6 +44,8 @@ class TCPClient(tcp_obj.TCPObj):
             if remaining < buff_size:
                 buff_size = remaining
             yield data
+        msg = self.encode_msg(bytes_recv.to_bytes(4, byteorder="big"), flags)
+        self.send_bytes(msg)
         yield from None
 
     # def receive(self):
