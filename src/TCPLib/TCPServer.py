@@ -156,7 +156,7 @@ class TCPServer:
         threading.Thread(target=self._listener.mainloop).start()
         return True
 
-    def close(self):
+    def stop(self):
         if self._is_running:
             self._is_running = False
             self._listener.close()

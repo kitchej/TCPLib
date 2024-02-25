@@ -23,38 +23,6 @@ class TCPClient(tcp_obj.TCPObj):
                             format="%(asctime)s - %(levelname)s: %(message)s",
                             datefmt="%m/%d/%Y %I:%M:%S %p")
 
-    def send(self, data: bytes, flags: int):
-        msg = self.encode_msg(data, flags)
-        if self.send_bytes(msg):
-            reply = self.receive_bytes(9)
-            return reply[0], reply[1], int.from_bytes(reply[2], byteorder='big')
-
-    def receive(self, buff_size):
-        bytes_recv = 0
-        size, flags = self.decode_header(self.receive_bytes(5))
-        if not size:
-            yield from None
-
-        while bytes_recv < size:
-            data = self.receive_bytes(buff_size)
-            if not data:
-                yield from None
-            bytes_recv += len(data)
-            remaining = size - bytes_recv
-            if remaining < buff_size:
-                buff_size = remaining
-            yield data
-        msg = self.encode_msg(bytes_recv.to_bytes(4, byteorder="big"), flags)
-        self.send_bytes(msg)
-        yield from None
-
-    # def receive(self):
-    #     size, flags, data = self.receive_bytes()
-    #     reply = len(data).to_bytes(4, byteorder='big')
-    #     self.send_bytes(reply, tcp_obj.COUNT)
-    #
-    #     return size, flags, data
-
     def connect(self, host: str, port: int):
         self._addr = (host, port)
         self._soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

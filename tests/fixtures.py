@@ -51,7 +51,7 @@ def server():
     s.start()
     time.sleep(0.1)
     yield s
-    s.close()
+    s.stop()
 
 
 @pytest.fixture

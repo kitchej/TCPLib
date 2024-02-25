@@ -74,7 +74,7 @@ def test_server_state(dummy_client, server):
     assert server.is_full() is False
     assert server.client_count() == 0
 
-    server.close()
+    server.stop()
 
     assert server.addr() == (HOST, PORT)
     assert server.is_running() is False
