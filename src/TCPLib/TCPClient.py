@@ -50,10 +50,10 @@ class TCPClient(tcp_obj.TCPObj):
         if self._is_connected:
             if warn:
                 self.send(b'', tcp_obj.DISCONNECT)
-            self._soc.close()
+            if self._soc is not None:
+                self._soc.close()
+                self._soc = None
             logging.info(f"Disconnected from host {self._addr[0]} @ {self._addr[1]}")
-            self._soc = None
             self._is_connected = False
             return True
-
         return False

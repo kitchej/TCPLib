@@ -6,7 +6,7 @@ from tests.fixtures import dummy_client, dummy_server, server, client, HOST, POR
 
 
 def recv(c, out: dict):
-    msg = c.receive()
+    msg = c.receive_all()
     out.update({"size": msg[0]})
     out.update({"flags": msg[1]})
     out.update({"data": msg[2]})

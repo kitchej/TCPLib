@@ -16,14 +16,6 @@ DATA = 2
 DISCONNECT = 4
 
 
-
-
-class ChunkInfo:
-    def __init__(self, chunk_size, total_size):
-        self.chunk_size = chunk_size
-        self.total_size = total_size
-
-
 class TCPObj(abc.ABC):
     '''Abstract base class defining a TCP send/receive interface'''
     def __init__(self, host, port):
@@ -127,11 +119,10 @@ class TCPObj(abc.ABC):
             self._clean_up()
             return
 
-    def send(self, data: bytes, flags: int):
+    def send(self, data: bytes, flags: int = DATA):
         msg = self.encode_msg(data, flags)
         if self.send_bytes(msg):
             reply = self.receive_bytes(9)
-            # return int.from_bytes(reply[2], byteorder='big')
             return reply
 
     def receive(self, buff_size):
@@ -143,7 +134,7 @@ class TCPObj(abc.ABC):
         if not header:
             return
         size, flags = self.decode_header(header)
-        yield size
+        yield size, flags
         while bytes_recv < size:
             data = self.receive_bytes(buff_size)
             if not data:
@@ -159,50 +150,12 @@ class TCPObj(abc.ABC):
     def receive_all(self, buff_size):
         data = bytearray()
         gen = self.receive(buff_size)
-        size = next(gen)
+        try:
+            size, flags = next(gen)
+        except StopIteration:
+            return
         for chunk in gen:
             if not chunk:
                 return ()
             data.extend(chunk)
-        return size, data
-
-
-    # def receive_bytes(self):
-    #     buff_size = self._buff_size
-    #     data = bytearray()
-    #     self._recv_ended_lock.acquire()
-    #     self._recv_ended = False
-    #     self._recv_ended_lock.release()
-    #     try:
-    #         header = self._soc.recv(5)
-    #         size, flags = self.decode_header(header)
-    #
-    #         if size < buff_size:
-    #             buff_size = size
-    #         while len(data) < size:
-    #             chunk = self._soc.recv(buff_size)
-    #             data.extend(chunk)
-    #             chunk_len = len(chunk)
-    #             if chunk_len < buff_size:
-    #                 buff_size = chunk_len
-    #
-    #             self._chunks.put(ChunkInfo(chunk_len, size))
-    #
-    #     except ConnectionAbortedError:
-    #         self._clean_up()
-    #         return ()
-    #     except ConnectionError:
-    #         self._clean_up()
-    #         return ()
-    #     except OSError:
-    #         self._clean_up()
-    #         return ()
-    #     except AttributeError:  # Socket was closed from another thread
-    #         self._clean_up()
-    #         return ()
-    #
-    #     self._recv_ended_lock.acquire()
-    #     self._recv_ended = True
-    #     self._recv_ended_lock.release()
-    #
-    #     return size, flags, data
+        return size, flags, data

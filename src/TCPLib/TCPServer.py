@@ -104,15 +104,8 @@ class TCPServer:
         return {
             "is_connected": client.is_connected(),
             "addr": client.addr(),
-            "timeout": client.timeout(),
-            "buff_size": client.buff_size(),
+            "timeout": client.timeout()
         }
-
-    def query_progress(self, client_id):
-        client = self._get_client(client_id)
-        if not client:
-            return
-        return client.query_progress()
 
     def disconnect_client(self, client_id: str, warn=True):
         self._connected_clients_lock.acquire()
