@@ -26,27 +26,8 @@ class ClientProcessor(tcp_obj.TCPObj):
     def id(self):
         return self._client_id
 
-    def disconnect(self, warn=True):
-        if self._is_connected:
-            if warn:
-                self.send(b'', tcp_obj.DISCONNECT)
-            self._soc.close()
-            logging.info(f"{self._client_id}: Client at {self._addr[0]} @ {self._addr[1]} was disconnected")
-            self._soc = None
-            self._is_connected = False
-
     def send(self, data: bytes, flags: int = tcp_obj.DATA):
-        with self._client_completed_recv_con:
-            self._client_completed_recv = ()
-
-        result = self.send_bytes(self.encode_msg(data, flags))
-        if not result:
-            return
-
-        with self._client_completed_recv_con:
-            while not self._client_completed_recv:
-                self._client_completed_recv_con.wait()
-            return self._client_completed_recv
+        return self.send_bytes(self.encode_msg(data, flags))
 
     def process_client(self, buff_size=4096):
         logging.debug(f"{self._client_id}: Waiting for messages from {self._addr[0]} @ {self._addr[1]}")
@@ -67,9 +48,7 @@ class ClientProcessor(tcp_obj.TCPObj):
                           f"{data}\n\n")
 
             if flags == 1:
-                with self._client_completed_recv_con:
-                    self._client_completed_recv = (size, flags, data)
-                    self._client_completed_recv_con.notify()
+                self._server_obj._messages.put(message.Message(self._client_id, size, flags, data))
             elif flags == 2:
                 self._server_obj._messages.put(message.Message(self._client_id, size, flags, data))
                 self.send(len(data).to_bytes(4, byteorder='big'), tcp_obj.COUNT)

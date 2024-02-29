@@ -76,16 +76,27 @@ class TCPObj(abc.ABC):
     def addr(self):
         return self._addr
 
-    @abc.abstractmethod
     def disconnect(self, warn=True):
-        '''
+        """
         If warn is set to true, a disconnect message will be sent to the server.
-        WARNING: If disconnecting after an error, warn should ALWAYS equal False
+        WARNING: If disconnecting after an error, warn should ALWAYS be False
         otherwise bad things will happen.
-        '''
-        pass
+        """
+        if self._is_connected:
+            if warn:
+                self.send_bytes(self.encode_msg(b'', DISCONNECT))
+            if self._soc is not None:
+                self._soc.close()
+                self._soc = None
+            logging.info(f"Disconnected from host {self._addr[0]} @ {self._addr[1]}")
+            self._is_connected = False
+            return True
+        return False
 
     def send_bytes(self, data: bytes):
+        """
+        Send all bytes. No header creation or waiting for a report of bytes received.
+        """
         try:
             self._soc.sendall(data)
             logging.debug(f"Sent msg to {self._addr[0]} @ {self._addr[1]}")
@@ -103,9 +114,22 @@ class TCPObj(abc.ABC):
             self._clean_up()
             return False
 
+    def send(self, data: bytes, flags: int = DATA):
+        """
+        Send all bytes with a header and wait for a response from the receiver
+        """
+        msg = self.encode_msg(data, flags)
+        if self.send_bytes(msg):
+            reply = self.receive_bytes(9)
+            size, flags = self.decode_header(reply[0:6])
+            return size, flags, int.from_bytes(reply[6:], byteorder='big')
+
     def receive_bytes(self, size: int):
+        """
+        Receive only the number of bytes specified. No header processing and no received bytes are reported.
+        """
         try:
-            return self._soc.recv(size)  # "A returned empty bytes object indicates that the client has disconnected"
+            return self._soc.recv(size)
         except ConnectionAbortedError:
             self._clean_up()
             return
@@ -119,15 +143,10 @@ class TCPObj(abc.ABC):
             self._clean_up()
             return
 
-    def send(self, data: bytes, flags: int = DATA):
-        msg = self.encode_msg(data, flags)
-        if self.send_bytes(msg):
-            reply = self.receive_bytes(9)
-            return reply
-
     def receive(self, buff_size):
         """
-        We have to give the caller the size and the flags, somehow...
+        Returns a generator for iterating over the bytes in an incoming message. First returns the size and flags, then
+        all bytes in the message. Sends a response back with the number of bytes received.
         """
         bytes_recv = 0
         header = self.receive_bytes(5)
@@ -148,6 +167,10 @@ class TCPObj(abc.ABC):
         self.send_bytes(msg)
 
     def receive_all(self, buff_size):
+        """
+        Receive all the bytes of an incoming message in one, easy method. Sends a response back with the number of
+        bytes received.
+        """
         data = bytearray()
         gen = self.receive(buff_size)
         try:
