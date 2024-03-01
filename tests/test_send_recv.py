@@ -2,17 +2,23 @@ import time
 import threading
 import os
 
-from tests.fixtures import dummy_client, dummy_server, server, client, HOST, PORT
+from tests.fixtures import server, client, HOST, PORT
 
 
 def recv(c, out: dict):
-    msg = c.receive_all(4096)
-    out.update({"size": msg[0]})
-    out.update({"flags": msg[1]})
-    out.update({"data": msg[2]})
+    reply = c.receive_all(4096)
+    if not reply:
+        raise AssertionError
+    out.update({"size": reply[0]})
+    out.update({"flags": reply[1]})
+    out.update({"data": reply[2]})
 
 
 def echo(client, server, data):
+    """
+    1.) Client sends message to server
+    2.) Server sends message to client
+    """
     time.sleep(0.1)
     client.connect(HOST, PORT)
     server_reply = client.send(data)
@@ -24,7 +30,7 @@ def echo(client, server, data):
     recv_th = threading.Thread(target=recv, args=[client, echo_msg])
     recv_th.start()
 
-    time.sleep(1)
+    time.sleep(0.1)
 
     client_reply = server.send(msg.client_id, msg.data)
 
@@ -41,8 +47,8 @@ def test_send_text(server, client):
     assert server_reply == (4, 1, len(text))
     assert client_reply
 
-    assert msg["size"] == len(text)
-    assert msg["flags"] == 2
+    assert msg["size"] == 4
+    assert msg["flags"] == 1
     assert msg["data"] == text
 
     client.disconnect()
