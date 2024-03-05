@@ -10,3 +10,6 @@ class Message:
         self.size = size
         self.flags = flags
         self.data = data
+
+    def __len__(self):
+        return self.size

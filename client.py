@@ -1,57 +1,51 @@
-import TCPLib.TCPClient as TCPClient
+from src.TCPLib.active_client import ActiveTcpClient, DEBUG
+from src.TCPLib.passive_client import PassiveTcpClient
 import threading
 import time
 from tqdm import tqdm
+import queue
 
 HOST = "127.0.0.1"
 PORT = 5000
-
-c = TCPClient.TCPClient(
+MESSAGES = queue.Queue()
+c_active = ActiveTcpClient(
         HOST,
         PORT,
-        logging_level=TCPClient.DEBUG,
+        MESSAGES,
+        logging_level=DEBUG,
         log_path="C:\\Users\\Josh\\PycharmProjects\\TCPLib\\client_log.txt"
     )
 
-
-def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█', printEnd = "\r"):
-    """
-    Call in a loop to create terminal progress bar
-    @params:
-        iteration   - Required  : current iteration (Int)
-        total       - Required  : total iterations (Int)
-        prefix      - Optional  : prefix string (Str)
-        suffix      - Optional  : suffix string (Str)
-        decimals    - Optional  : positive number of decimals in percent complete (Int)
-        length      - Optional  : character length of bar (Int)
-        fill        - Optional  : bar fill character (Str)
-        printEnd    - Optional  : end character (e.g. "\r", "\r\n") (Str)
-    """
-    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
-    filledLength = int(length * iteration // total)
-    bar = fill * filledLength + '-' * (length - filledLength)
-    print(f'\r{prefix} |{bar}| {percent}% {suffix}', end=printEnd)
-    # Print New Line on Complete
-    if iteration == total:
-        print()
+c_passive = PassiveTcpClient(HOST, PORT)
 
 
-BUFF_SIZE = 1024
+def active(client):
+    client.start()
+    while MESSAGES.empty():
+        time.sleep(0.1)
+    msg = MESSAGES.get()
+    print(msg.data)
+    client.stop()
 
-c.connect(HOST, PORT)
 
-data = bytearray()
-gen = c.receive(BUFF_SIZE)
+def passive(client):
+    BUFF_SIZE = 1024
+    client.connect(HOST, PORT)
+    data = bytearray()
+    gen = client.receive(BUFF_SIZE)
+    size, flags = next(gen)
+    print(f"Receiving {size} bytes")
+    total_iter = int(size / BUFF_SIZE)
+    for chunk in tqdm(gen, total=total_iter):
+        data.extend(chunk)
+    print(f"Completed receiving {size} bytes")
 
-size, flags = next(gen)
-print(f"Receiving {size} bytes")
-total_iter = int(size / BUFF_SIZE)
-for chunk in tqdm(gen, total=total_iter):
-    data.extend(chunk)
-print(f"Completed receiving {size} bytes")
 
-c.disconnect()
+    # size, data = client.receive_all(4096)
+    # print(f"Size = {size} | Bytes Recv = {len(data)}")
 
-# size, data = c.receive_all(4096)
-# print(f"Size = {size} | Bytes Recv = {len(data)}")
+    client.disconnect()
 
+
+passive(c_passive)
+# active(c_active)

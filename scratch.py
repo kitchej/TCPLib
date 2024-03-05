@@ -3,6 +3,8 @@ import threading
 import os
 import pathlib
 from datetime import datetime
+import traceback
+import queue
 
 import TCPLib.TCPClient as TCPClient
 import TCPLib.TCPServer as TCPServer
@@ -33,7 +35,6 @@ c = TCPClient.TCPClient(
 
 def recv(c, out: dict):
     reply = c.receive_all(4096)
-
     if not reply:
         raise AssertionError
     reply = c.receive_all(4096)
@@ -43,52 +44,55 @@ def recv(c, out: dict):
     out.update({"data": reply[2]})
 
 
+def client_thread(c, out: queue.Queue):
+    while c.is_connected():
+        reply = c.receive_all(4096)
+        if not reply:
+            return
+        out.put(reply)
+
+
+
 def echo(client, server, data):
-    """
-    1.) Client sends message to server
-    2.) Server sends message to client
-    """
-    time.sleep(0.1)
+    # 1.) Client sends data and waits for response from the server
+    # 2.) Server receives the message and sends back how many bytes it received
+    # 3.) Server waits a brief moment then echos what it received
+    # 4.)
+    client_messages = queue.Queue()
     client.connect(HOST, PORT)
-    server_reply = client.send(data)
+    threading.Thread(target=client_thread, args=[client, client_messages]).start()
 
-    thread_log("main", "server_reply", server_reply)
-
-    time.sleep(0.1)
-    msg = server.pop_msg()
-
-    thread_log("main", 'msg', msg.data)
-
-    echo_msg = {}
-    recv_th = threading.Thread(target=recv, args=[client, echo_msg])
-    recv_th.start()
+    server_ack = client.send(data)
 
     time.sleep(0.1)
 
-    client_reply = server.send(msg.client_id, msg.data)
+    server_copy = server.pop_msg()
 
-    # thread_log("main", 'client_reply', client_reply)
+    server.send(server.list_clients()[0], server_copy.data)
 
-    return server_reply, client_reply, echo_msg
+    time.sleep(0.1)
+
+    while not client_messages.empty():
+        print(client_messages.get())
+
+    client.disconnect()
+    return
+
 
 
 def send_text(server, client):
     with open(os.path.abspath(os.path.join("tests", "dummy_files", "DOI.txt")), 'rb') as file:
         text = file.read()
 
-    server_reply, client_reply, msg = echo(client, server, text)
-    time.sleep(0.1)
-
-    # thread_log("main", "server_reply", server_reply)
-    # thread_log("main", 'client_reply', client_reply)
-    # thread_log("main", 'msg', msg)
-
-    assert server_reply == (4, 1, len(text))
-    assert client_reply
-
-    assert msg["size"] == 4
-    assert msg["flags"] == 1
-    assert msg["data"] == text
+    print(echo(client, server, text))
+    # time.sleep(0.1)
+    #
+    # assert server_reply == (4, 1, len(text))
+    # assert client_reply
+    #
+    # assert msg["size"] == 4
+    # assert msg["flags"] == 1
+    # assert msg["data"] == text
 
     client.disconnect()
 
@@ -96,7 +100,7 @@ def send_text(server, client):
 try:
     send_text(s, c)
 except Exception as e:
-    print(e)
+    traceback.print_exception(e)
 finally:
     s.stop()
     c.disconnect()

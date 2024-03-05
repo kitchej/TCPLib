@@ -7,7 +7,7 @@ import threading
 import random
 import socket
 
-from TCPLib.internals.client_processor import ClientProcessor
+from .client_processor import ClientProcessor
 logging.getLogger(__name__)
 
 

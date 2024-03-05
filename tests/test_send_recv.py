@@ -15,10 +15,6 @@ def recv(c, out: dict):
 
 
 def echo(client, server, data):
-    """
-    1.) Client sends message to server
-    2.) Server sends message to client
-    """
     time.sleep(0.1)
     client.connect(HOST, PORT)
     server_reply = client.send(data)

@@ -1,5 +1,5 @@
 """
-TCPServer.py
+tcp_server.py
 Written by: Joshua Kitchen - 2024
 """
 
@@ -7,13 +7,19 @@ import logging
 import threading
 import queue
 
-from TCPLib.internals.listener import Listener
-from TCPLib.internals.client_processor import ClientProcessor
+from .internals.listener import Listener
+from .internals.client_processor import ClientProcessor
+from .internals.message import Message
 
 # Bindings for log levels, so the user doesn't have to import the logging module for one parameter
 
 INFO = logging.INFO
 DEBUG = logging.DEBUG
+
+# Message flags
+COUNT = 1
+DATA = 2
+DISCONNECT = 4
 
 
 class TCPServer:
@@ -120,6 +126,9 @@ class TCPServer:
             client.disconnect(warn=warn)
         return True
 
+    def put_msg(self, msg: Message, block=False):
+        self._messages.put(msg, block=block)
+
     def pop_msg(self, block=False):
         try:
             return self._messages.get(block=block)
@@ -138,7 +147,7 @@ class TCPServer:
             self._connected_clients_lock.release()
             return False
         self._connected_clients_lock.release()
-        return client.send(data)
+        return client.send(data, wait_for_awck=False)
 
     def start(self):
         if self._is_running:

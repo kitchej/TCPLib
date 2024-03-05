@@ -1,4 +1,4 @@
-import TCPLib.TCPServer as TCPServer
+import src.TCPLib.tcp_server as tcp_server
 import os
 import pathlib
 import time
@@ -28,6 +28,9 @@ PORT = 5000
 
 with open(os.path.join("tests", "dummy_files", "one-gig-vid.mkv"), 'rb') as file:
     video = file.read()
+
+with open(os.path.join("tests", "dummy_files", "DOI.txt"), 'rb') as file:
+    text = file.read()
 
 
 class DummyServer:
@@ -80,10 +83,10 @@ class DummyServer:
 
 
 def use_real(message):
-    s = TCPServer.TCPServer(
+    s = tcp_server.TCPServer(
         HOST,
         PORT,
-        logging_level=TCPServer.DEBUG,
+        logging_level=tcp_server.DEBUG,
         log_path="C:\\Users\\Josh\\PycharmProjects\\TCPLib\\server_log.txt"
     )
     s.start()
@@ -107,10 +110,11 @@ def use_dummy(message):
     while True:
         print("Waiting for client")
         client_soc, client_addr = s.listen()
-        print(f"Connected to {client_addr} = {client_soc}")
+        print(f"Connected to {client_addr}")
         print(f"Sending {len(message)} bytes to Client")
         result = s.send(message, client_soc)
         print(f"REPLY = {result}\n")
 
 
-use_real(video)
+# use_dummy(text)
+use_dummy(video)
