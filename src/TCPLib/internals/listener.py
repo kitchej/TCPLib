@@ -59,15 +59,11 @@ class Listener:
                 if self._server_obj.is_full():
                     client_soc.stop()
                     continue
-                processor = ClientProcessor(client_id=self._generate_client_id(),
-                                            host=client_addr[0],
-                                            port=client_addr[1],
-                                            client_soc=client_soc,
-                                            server_obj=self._server_obj)
-                proc_th = threading.Thread(target=processor.process_client)
-                proc_th.start()
-                self._server_obj.update_connected_clients(processor.id(), processor)
-                logging.info(f"SERVER: Client at {processor.addr()[0]} @ {processor.addr()[1]} was connected")
+                self._server_obj.start_client_proc(self._generate_client_id(),
+                                                   client_addr[0],
+                                                   client_addr[1],
+                                                   client_soc)
+
             except OSError as e:
                 logging.debug("Exception", exc_info=e)
                 logging.info("Server shutdown")

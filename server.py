@@ -117,4 +117,6 @@ def use_dummy(message):
 
 
 # use_dummy(text)
-use_dummy(video)
+# use_dummy(video)
+
+use_real(text)

@@ -50,6 +50,17 @@ class TCPServer:
 
         return client
 
+    def start_client_proc(self, client_id, host, port, client_soc):
+        client_proc = ClientProcessor(client_id=client_id,
+                                      host=host,
+                                      port=port,
+                                      client_soc=client_soc,
+                                      msg_queue=self._messages)
+
+        client_proc.start()
+        self.update_connected_clients(client_proc.id(), client_proc)
+        logging.info(f"SERVER: Client at {client_proc.addr()[0]} @ {client_proc.addr()[1]} was connected")
+
     def update_connected_clients(self, client_id: str, client: ClientProcessor):
         self._connected_clients_lock.acquire()
         self._connected_clients.update({client_id: client})
