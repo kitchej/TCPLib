@@ -33,7 +33,11 @@ def passive(client):
     client.connect(HOST, PORT)
     data = bytearray()
     gen = client.receive(BUFF_SIZE)
-    size, flags = next(gen)
+    try:
+        size, flags = next(gen)
+    except StopIteration as e:
+        print(e)
+        return
     print(f"Receiving {size} bytes")
     total_iter = int(size / BUFF_SIZE)
     for chunk in tqdm(gen, total=total_iter):
