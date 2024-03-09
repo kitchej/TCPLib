@@ -19,9 +19,6 @@ class ClientProcessor(ActiveTcpClient):
         ActiveTcpClient.__init__(self, host, port, msg_queue, buff_size, client_id)
         self._client_soc = client_soc
 
-    def id(self):
-        return self._client_id
-
     def start(self):
         self._tcp_client.connect(self._host, self._port, self._client_soc)
         self._is_running = True

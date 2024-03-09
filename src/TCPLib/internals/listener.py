@@ -57,7 +57,7 @@ class Listener:
                 self._soc.listen()
                 client_soc, client_addr = self._soc.accept()
                 if self._server_obj.is_full():
-                    client_soc.stop()
+                    client_soc.close()
                     continue
                 self._server_obj.start_client_proc(self._generate_client_id(),
                                                    client_addr[0],

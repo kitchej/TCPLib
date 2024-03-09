@@ -28,9 +28,8 @@ def test_server_state(dummy_client, server):
     client_info = server.get_client_info(client)
 
     try:
-        assert client_info["is_connected"] is True
+        assert client_info["is_running"] is True
         assert client_info["addr"][0] == HOST
-        assert client_info["timeout"] is None
     except KeyError:
         assert False
 
@@ -38,7 +37,7 @@ def test_server_state(dummy_client, server):
     client_info = server.get_client_info(client)
 
     try:
-        assert client_info["is_connected"] is True
+        assert client_info["is_running"] is True
         assert client_info["addr"][0] == HOST
         assert client_info["timeout"] == 10
     except KeyError:

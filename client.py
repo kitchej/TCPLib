@@ -24,8 +24,8 @@ def active(client):
     while MESSAGES.empty():
         time.sleep(0.1)
     msg = MESSAGES.get()
-    print(msg.data)
-    client.stop()
+    print(f"Received {msg.size} bytes")
+    client.stop(warn=True)
 
 
 def passive(client):
@@ -51,6 +51,7 @@ def passive(client):
     client.disconnect()
 
 
-passive(c_passive)
-# active(c_active)
-#
+# passive(c_passive)
+active(c_active)
+
+

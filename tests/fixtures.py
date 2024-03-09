@@ -1,3 +1,4 @@
+import queue
 import threading
 import pathlib
 import os
@@ -5,8 +6,9 @@ import pytest
 import time
 import socket
 
-import TCPLib.TCPClient as TCPClient
-import TCPLib.TCPServer as TCPServer
+from TCPLib.passive_client import PassiveTcpClient
+from TCPLib.tcp_server import TCPServer, DEBUG
+from TCPLib.active_client import ActiveTcpClient
 
 HOST = "127.0.0.1"
 PORT = 5000
@@ -42,10 +44,10 @@ def dummy_server():
 
 @pytest.fixture
 def server():
-    s = TCPServer.TCPServer(
+    s = TCPServer(
         HOST,
         PORT,
-        logging_level=TCPServer.DEBUG,
+        logging_level=DEBUG,
         log_path=os.path.join(pathlib.Path.home(), ".server_log")
     )
     s.start()
@@ -63,19 +65,28 @@ def dummy_client():
 
 @pytest.fixture
 def client():
-    c = TCPClient.TCPClient(
+    c = PassiveTcpClient(
         HOST,
-        PORT,
-        logging_level=TCPClient.DEBUG,
-        log_path=os.path.join(pathlib.Path.home(), ".server_log")
-    )
+        PORT)
     yield c
     c.disconnect()
 
 
 @pytest.fixture
+def a_client():
+    msg_queue = queue.Queue()
+    c = ActiveTcpClient(
+        HOST,
+        PORT,
+        msg_queue)
+    c.start()
+    yield c, msg_queue
+    c.stop()
+
+
+@pytest.fixture
 def client_list():
-    clients = [TCPClient.TCPClient(HOST, PORT, logging_level=TCPClient.DEBUG) for _ in range(10)]
+    clients = [PassiveTcpClient(HOST, PORT) for _ in range(10)]
     yield clients
     for client in clients:
         client.disconnect()

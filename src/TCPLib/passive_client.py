@@ -80,10 +80,11 @@ class PassiveTcpClient:
         if soc:
             self._soc = soc
             self._soc.settimeout(self._timeout)
+            return
         else:
             self._soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self._soc.settimeout(self._timeout)
-            return
+
         logging.info(f"Connecting to {self._addr[0]} @ {self._addr[1]}")
 
         try:
@@ -141,7 +142,7 @@ class PassiveTcpClient:
             self._clean_up()
             return False
 
-    def send(self, data: bytes, flags: int = DATA, wait_for_awck=True):
+    def send(self, data: bytes, flags: int = DATA):
         """
         Send all bytes with a header
         """
@@ -171,7 +172,7 @@ class PassiveTcpClient:
     def receive(self, buff_size):
         """
         Returns a generator for iterating over the bytes in an incoming message. First returns the size and flags, then
-        all bytes in the message. Sends a response back with the number of bytes received.
+        all bytes in the message.
         """
         bytes_recv = 0
         header = self.receive_bytes(5)
@@ -188,13 +189,10 @@ class PassiveTcpClient:
             if remaining < buff_size:
                 buff_size = remaining
             yield data
-        msg = self.encode_msg(bytes_recv.to_bytes(4, byteorder="big"), COUNT)
-        self.send_bytes(msg)
 
     def receive_all(self, buff_size):
         """
-        Receive all the bytes of an incoming message in one, easy method. Sends a response back with the number of
-        bytes received.
+        Receive all the bytes of an incoming message in one, easy method.
         """
         data = bytearray()
         gen = self.receive(buff_size)
@@ -202,11 +200,6 @@ class PassiveTcpClient:
             size, flags = next(gen)
         except StopIteration:
             return
-        total_iter = int(size / buff_size)
-        # for chunk in tqdm(gen, total=total_iter):
-        #     if not chunk:
-        #         return ()
-        #     data.extend(chunk)
         for chunk in gen:
             if not chunk:
                 return ()

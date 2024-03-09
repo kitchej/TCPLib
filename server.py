@@ -92,16 +92,21 @@ def use_real(message):
     s.start()
 
     while True:
-
         print(f"Waiting for clients: {s.client_count()} clients connected")
         while s.client_count() != 1:
             continue
 
         print(f"Sending {len(message)} bytes to Client")
-        result = s.send(s.list_clients()[0], message)
-        print(f"REPLY = {result}\n")
+        client_id = s.list_clients()[0]
+        result = s.send(client_id, message)
+        if not result:
+            s.disconnect_client(s.list_clients()[0], warn=False)
+            continue
 
-        s.disconnect_client(s.list_clients()[0], warn=False)
+        reply = s.pop_msg(block=True)
+
+        print(f"REPLY = Size: {reply.size} | Flags: {reply.flags} | Data: {int.from_bytes(reply.data, byteorder='big')}\n")
+        s.disconnect_client(client_id, warn=False)
 
 
 def use_dummy(message):
@@ -119,4 +124,5 @@ def use_dummy(message):
 # use_dummy(text)
 # use_dummy(video)
 
-use_real(text)
+# use_real(text)
+use_real(video)

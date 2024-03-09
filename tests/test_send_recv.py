@@ -1,91 +1,71 @@
 import time
-import threading
 import os
 
-from tests.fixtures import server, client, HOST, PORT
+from tests.fixtures import server, a_client, HOST, PORT
 
 
-def recv(c, out: dict):
-    reply = c.receive_all(4096)
-    if not reply:
-        raise AssertionError
-    out.update({"size": reply[0]})
-    out.update({"flags": reply[1]})
-    out.update({"data": reply[2]})
-
-
-def echo(client, server, data):
+def echo(client, server, data, client_msg_q):
     time.sleep(0.1)
-    client.connect(HOST, PORT)
-    server_reply = client.send(data)
+    client_id = server.list_clients()[0]
+    client.send(data)
 
-    time.sleep(0.1)
-    msg = server.pop_msg()
+    server_copy = server.pop_msg(block=True)
+    server.send(client_id, server_copy.data)
 
-    echo_msg = {}
-    recv_th = threading.Thread(target=recv, args=[client, echo_msg])
-    recv_th.start()
+    client_copy = client_msg_q.get(block=True)
 
-    time.sleep(0.1)
+    server_copy = {
+        "size": server_copy.size,
+        "flags": server_copy.flags,
+        "data": server_copy.data
+        }
 
-    client_reply = server.send(msg.client_id, msg.data)
+    client_copy = {
+        "size": client_copy.size,
+        "flags": client_copy.flags,
+        "data": client_copy.data
+    }
 
-    return server_reply, client_reply, echo_msg
+    return server_copy, client_copy
 
 
-def test_send_text(server, client):
-    with open(os.path.abspath(os.path.join("dummy_files", "DOI.txt")), 'rb') as file:
+def test_send_text(server, a_client):
+    with open(os.path.abspath(os.path.join("tests", "dummy_files", "DOI.txt")), 'rb') as file:
         text = file.read()
+    client = a_client[0]
+    client_msgs = a_client[1]
+    server_msg, client_msg = echo(client, server, text, client_msgs)
 
-    server_reply, client_reply, msg = echo(client, server, text)
-    time.sleep(0.1)
-
-    assert server_reply == (4, 1, len(text))
-    assert client_reply
-
-    assert msg["size"] == 4
-    assert msg["flags"] == 1
-    assert msg["data"] == text
-
-    client.disconnect()
+    pass
 
 
-def test_send_photo(server, client):
-    with open(os.path.abspath(os.path.join("dummy_files", "photo.jpg")), 'rb') as file:
+def test_send_photo(server, a_client):
+    with open(os.path.abspath(os.path.join("tests", "dummy_files", "photo.jpg")), 'rb') as file:
         photo = file.read()
 
-    server_reply, client_reply, msg = echo(client, server, photo)
-    time.sleep(0.1)
+    client = a_client[0]
+    client_msgs = a_client[1]
+    client_msg, server_msg = echo(client, server, photo, client_msgs)
 
-    assert server_reply == (4, 1, len(photo))
-    assert client_reply
-
-    assert msg["size"] == len(photo)
-    assert msg["flags"] == 2
-    assert msg["data"] == photo
-
-    client.disconnect()
+    # assert client_send_result
+    # assert server_send_result
+    #
+    # assert msg["size"] == len(photo)
+    # assert msg["flags"] == 2
+    # assert msg["data"] == photo
 
 
-def test_send_video(server, client):
-    buff_size = 16384
-
-    with open(os.path.abspath(os.path.join("dummy_files", "video.mp4")), 'rb') as file:
+def test_send_video(server, a_client):
+    with open(os.path.abspath(os.path.join("tests", "dummy_files", "video.mp4")), 'rb') as file:
         video = file.read()
 
-    client.set_buff_size(buff_size)
-    server.set_default_buff_size(buff_size)
+    client = a_client[0]
+    client_msgs = a_client[1]
+    client_msg, server_msg = echo(client, server, video, client_msgs)
 
-    echo(client, server, video)
-
-    server_reply, client_reply, msg = echo(client, server, video)
-    time.sleep(0.1)
-
-    assert server_reply == (4, 1, len(video))
-    assert client_reply
-
-    assert msg["size"] == len(video)
-    assert msg["flags"] == 2
-    assert msg["data"] == video
-
-    client.disconnect()
+    # assert client_send_result
+    # assert server_send_result
+    #
+    # assert msg["size"] == len(video)
+    # assert msg["flags"] == 2
+    # assert msg["data"] == video

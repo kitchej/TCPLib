@@ -104,24 +104,13 @@ class TCPServer:
         self._connected_clients_lock.release()
         return list(client_list)
 
-    def edit_client_prop(self, client_id, timeout=None, buff_size=None):
-        client = self._get_client(client_id)
-        if not client:
-            return False
-        if timeout:
-            client.set_timeout(timeout)
-        if buff_size:
-            client.set_buff_size(buff_size)
-        return True
-
     def get_client_info(self, client_id):
         client = self._get_client(client_id)
         if not client:
             return
         return {
-            "is_connected": client.is_connected(),
-            "addr": client.addr(),
-            "timeout": client.timeout()
+            "is_running": client.is_running(),
+            "addr": client.addr()
         }
 
     def disconnect_client(self, client_id: str, warn=True):
@@ -133,8 +122,8 @@ class TCPServer:
             return False
         del self._connected_clients[client_id]
         self._connected_clients_lock.release()
-        if client.is_connected():
-            client.disconnect(warn=warn)
+        if client.is_running():
+            client.stop(warn=warn)
         return True
 
     def put_msg(self, msg: Message, block=False):
@@ -150,6 +139,9 @@ class TCPServer:
         while not self._messages.empty():
             yield self.pop_msg(block=block)
 
+    def has_messages(self):
+        return self._messages.empty()
+
     def send(self, client_id: str, data: bytes):
         self._connected_clients_lock.acquire()
         try:
@@ -158,7 +150,7 @@ class TCPServer:
             self._connected_clients_lock.release()
             return False
         self._connected_clients_lock.release()
-        return client.send(data, wait_for_awck=False)
+        return client.send(data, 2)
 
     def start(self):
         if self._is_running:
@@ -175,7 +167,7 @@ class TCPServer:
             self._listener.close()
             self._connected_clients_lock.acquire()
             for client in self._connected_clients.values():
-                client.disconnect()
+                client.stop()
             self._connected_clients.clear()
             self._connected_clients_lock.release()
             logging.info("SERVER: Server has been shutdown")

@@ -48,10 +48,17 @@ class ActiveTcpClient:
                 return
             size, flags, data = msg[0], msg[1], msg[2]
             self._msg_queue.put(Message(self._client_id, size, flags, data))
-            if flags == 2:
-                self._tcp_client.send(len(data).to_bytes(4, byteorder='big'), COUNT)
-            elif flags == 4:
+            if flags == 4:
                 self._clean_up()
+
+    def timeout(self):
+        return self._tcp_client.timeout()
+
+    def set_timeout(self, timeout: int):
+        self._tcp_client.set_timeout(timeout)
+
+    def send(self, data: bytes, flags: int = DATA):
+        return self._tcp_client.send(data, flags)
 
     def id(self):
         return self._client_id
@@ -68,6 +75,6 @@ class ActiveTcpClient:
         th = threading.Thread(target=self._receive_loop)
         th.start()
 
-    def stop(self):
+    def stop(self, warn=False):
         self._is_running = False
-        self._tcp_client.disconnect()
+        self._tcp_client.disconnect(warn=warn)
