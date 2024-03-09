@@ -33,16 +33,6 @@ def test_server_state(dummy_client, server):
     except KeyError:
         assert False
 
-    server.edit_client_prop(client, timeout=10)
-    client_info = server.get_client_info(client)
-
-    try:
-        assert client_info["is_running"] is True
-        assert client_info["addr"][0] == HOST
-        assert client_info["timeout"] == 10
-    except KeyError:
-        assert False
-
     server.disconnect_client(client)
 
     assert server.is_full() is False

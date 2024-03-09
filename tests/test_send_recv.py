@@ -36,7 +36,13 @@ def test_send_text(server, a_client):
     client_msgs = a_client[1]
     server_msg, client_msg = echo(client, server, text, client_msgs)
 
-    pass
+    assert server_msg["size"] == len(text)
+    assert server_msg["flags"] == 2
+    assert server_msg["data"] == text
+
+    assert client_msg["size"] == len(text)
+    assert client_msg["flags"] == 2
+    assert client_msg["data"] == text
 
 
 def test_send_photo(server, a_client):
@@ -45,14 +51,15 @@ def test_send_photo(server, a_client):
 
     client = a_client[0]
     client_msgs = a_client[1]
-    client_msg, server_msg = echo(client, server, photo, client_msgs)
+    server_msg, client_msg = echo(client, server, photo, client_msgs)
 
-    # assert client_send_result
-    # assert server_send_result
-    #
-    # assert msg["size"] == len(photo)
-    # assert msg["flags"] == 2
-    # assert msg["data"] == photo
+    assert server_msg["size"] == len(photo)
+    assert server_msg["flags"] == 2
+    assert server_msg["data"] == photo
+
+    assert client_msg["size"] == len(photo)
+    assert client_msg["flags"] == 2
+    assert client_msg["data"] == photo
 
 
 def test_send_video(server, a_client):
@@ -61,11 +68,12 @@ def test_send_video(server, a_client):
 
     client = a_client[0]
     client_msgs = a_client[1]
-    client_msg, server_msg = echo(client, server, video, client_msgs)
+    server_msg, client_msg = echo(client, server, video, client_msgs)
 
-    # assert client_send_result
-    # assert server_send_result
-    #
-    # assert msg["size"] == len(video)
-    # assert msg["flags"] == 2
-    # assert msg["data"] == video
+    assert server_msg["size"] == len(video)
+    assert server_msg["flags"] == 2
+    assert server_msg["data"] == video
+
+    assert client_msg["size"] == len(video)
+    assert client_msg["flags"] == 2
+    assert client_msg["data"] == video
