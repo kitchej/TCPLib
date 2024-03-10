@@ -51,7 +51,7 @@ def passive(client):
     client.disconnect()
 
 
-# passive(c_passive)
-active(c_active)
+passive(c_passive)
+# active(c_active)
 
 

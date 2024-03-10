@@ -4,7 +4,6 @@ Written by: Joshua Kitchen - 2024
 """
 import logging
 import socket
-from tqdm import tqdm
 
 logging.getLogger(__name__)
 
