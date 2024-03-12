@@ -1,4 +1,6 @@
-from src.TCPLib.active_client import ActiveTcpClient, DEBUG
+import logging
+
+from src.TCPLib.active_client import ActiveTcpClient
 from src.TCPLib.passive_client import PassiveTcpClient
 import threading
 import time
@@ -12,20 +14,25 @@ c_active = ActiveTcpClient(
         HOST,
         PORT,
         MESSAGES,
-        logging_level=DEBUG,
-        log_path="C:\\Users\\Josh\\PycharmProjects\\TCPLib\\client_log.txt"
+        r"logs\Client1",
+        "ActiveClient.log",
+        logging.DEBUG
     )
 
-c_passive = PassiveTcpClient(HOST, PORT)
+c_passive = PassiveTcpClient(
+    HOST,
+    PORT,
+    r"logs\PassiveClient.log",
+    logging.DEBUG
+)
 
 
 def active(client):
+    client.toggle_console_logging()
     client.start()
-    while MESSAGES.empty():
-        time.sleep(0.1)
-    msg = MESSAGES.get()
-    print(f"Received {msg.size} bytes")
-    client.stop(warn=True)
+    while client.is_running():
+        msg = MESSAGES.get(block=True)
+        print(f"Received {msg.size} bytes")
 
 
 def passive(client):
@@ -51,7 +58,5 @@ def passive(client):
     client.disconnect()
 
 
-passive(c_passive)
-# active(c_active)
-
-
+# passive(c_passive)
+active(c_active)

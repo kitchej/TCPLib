@@ -1,10 +1,11 @@
 import src.TCPLib.tcp_server as tcp_server
 import os
-import pathlib
-import time
+import logging
 import threading
 import socket
 import traceback
+
+from server_interface import ServerInterface
 
 
 def encode_msg(data: bytes, flags: int):
@@ -86,8 +87,8 @@ def use_real(message):
     s = tcp_server.TCPServer(
         HOST,
         PORT,
-        logging_level=tcp_server.DEBUG,
-        log_path="C:\\Users\\Josh\\PycharmProjects\\TCPLib\\server_log.txt"
+        r"logs\Server.log",
+        logging.DEBUG
     )
     s.start()
 
@@ -121,8 +122,26 @@ def use_dummy(message):
         print(f"REPLY = {result}\n")
 
 
+def use_interface():
+    s = tcp_server.TCPServer(
+        HOST,
+        PORT,
+        r"logs\Server.log",
+        logging.DEBUG
+    )
+    s.start()
+    inter = ServerInterface(s)
+
+    # s.toggle_console_log()
+
+    th = threading.Thread(target=inter.mainloop)
+    th.start()
+    th.join()
+
 # use_dummy(text)
 # use_dummy(video)
 
 # use_real(text)
-use_real(video)
+# use_real(video)
+
+use_interface()
