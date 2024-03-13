@@ -124,7 +124,7 @@ def use_dummy(message):
 
 def use_interface():
     s = tcp_server.TCPServer(
-        HOST,
+        "192.168.56.1",
         PORT,
         r"logs\Server.log",
         logging.DEBUG
@@ -137,6 +137,7 @@ def use_interface():
     th = threading.Thread(target=inter.mainloop)
     th.start()
     th.join()
+
 
 # use_dummy(text)
 # use_dummy(video)
