@@ -9,7 +9,7 @@ class LogLevels:
 
 
 def config_logger(logger, log_path, log_level):
-    file_handler = logging.FileHandler(log_path)
+    file_handler = logging.FileHandler(log_path, mode='w')
     file_handler.set_name("TCPLibFileHandler")
     file_handler.setLevel(log_level)
 

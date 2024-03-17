@@ -87,7 +87,7 @@ def use_real(message):
     s = tcp_server.TCPServer(
         HOST,
         PORT,
-        r"logs\Server.log",
+        r"tests/logs\Server.log",
         logging.DEBUG
     )
     s.start()
@@ -124,9 +124,9 @@ def use_dummy(message):
 
 def use_interface():
     s = tcp_server.TCPServer(
-        "192.168.56.1",
+        "192.168.0.2",
         PORT,
-        r"logs\Server.log",
+        r"tests/logs\Server.log",
         logging.DEBUG
     )
     s.start()

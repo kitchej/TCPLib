@@ -10,7 +10,6 @@ import queue
 from .logger.logger import config_logger, LogLevels, toggle_stream_handler
 from .internals.listener import Listener
 from .internals.client_processor import ClientProcessor
-from .internals.message import Message
 
 
 # Message flags
@@ -143,9 +142,6 @@ class TCPServer:
         if client.is_running():
             client.stop(warn=warn)
         return True
-
-    def put_msg(self, msg: Message, block=False):
-        self._messages.put(msg, block=block)
 
     def pop_msg(self, block=False):
         try:

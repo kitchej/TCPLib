@@ -76,8 +76,7 @@ class PassiveTcpClient:
     def addr(self):
         return self._addr
 
-    def connect(self, host: str, port: int, soc: socket.socket = None):
-        self._addr = (host, port)
+    def connect(self, soc: socket.socket = None):
         if soc:
             self._soc = soc
             self._soc.settimeout(self._timeout)

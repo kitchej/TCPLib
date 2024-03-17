@@ -14,7 +14,7 @@ c_active = ActiveTcpClient(
         HOST,
         PORT,
         MESSAGES,
-        r"logs\Client1",
+    r"tests/logs\Client1",
         "ActiveClient.log",
         logging.DEBUG
     )
@@ -22,7 +22,7 @@ c_active = ActiveTcpClient(
 c_passive = PassiveTcpClient(
     HOST,
     PORT,
-    r"logs\PassiveClient.log",
+    r"tests/logs\PassiveClient.log",
     logging.DEBUG
 )
 
