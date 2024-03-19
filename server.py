@@ -9,7 +9,8 @@ from server_interface import ServerInterface
 import src.TCPLib.logger.logger as log_util
 
 logger = logging.getLogger()
-log_util.config_logger(logger, "Server_Log", logging.DEBUG)
+log_util.config_logger(logger, "Server_Log", logging.INFO)
+log_util.toggle_stream_handler(logger, logging.INFO)
 
 print("server.py, ", logger.name)
 
@@ -97,11 +98,10 @@ def use_real(message):
     s.start()
 
     while True:
-        print(f"Waiting for clients: {s.client_count()} clients connected")
+        logging.info(f"Waiting for clients: {s.client_count()} clients connected")
         while s.client_count() != 1:
             continue
 
-        print(f"Sending {len(message)} bytes to Client")
         client_id = s.list_clients()[0]
         result = s.send(client_id, message)
         if not result:
@@ -110,7 +110,7 @@ def use_real(message):
 
         reply = s.pop_msg(block=True)
 
-        print(f"REPLY = Size: {reply.size} | Flags: {reply.flags} | Data: {int.from_bytes(reply.data, byteorder='big')}\n")
+        logging.info(f"REPLY = Size: {reply.size} | Flags: {reply.flags} | Data: {int.from_bytes(reply.data, byteorder='big')}\n")
         s.disconnect_client(client_id, warn=False)
 
 
@@ -118,20 +118,18 @@ def use_dummy(message):
     s = DummyServer(HOST, PORT)
 
     while True:
-        print("Waiting for client")
+        logging.info("Waiting for client")
         client_soc, client_addr = s.listen()
-        print(f"Connected to {client_addr}")
-        print(f"Sending {len(message)} bytes to Client")
+        logging.info(f"Connected to {client_addr}")
+        logging.info(f"Sending {len(message)} bytes to Client")
         result = s.send(message, client_soc)
-        print(f"REPLY = {result}\n")
+        logging.info(f"REPLY = {result}\n")
 
 
 def use_interface():
     s = tcp_server.TCPServer(
         "192.168.0.2",
-        PORT,
-        r"tests/logs\Server.log",
-        logging.DEBUG
+        PORT
     )
     s.start()
     inter = ServerInterface(s)

@@ -9,7 +9,8 @@ from tqdm import tqdm
 import queue
 
 logger = logging.getLogger()
-log_util.config_logger(logger, "Client_Log", logging.DEBUG)
+log_util.config_logger(logger, "Client_Log", logging.INFO)
+log_util.toggle_stream_handler(logger, logging.INFO)
 
 HOST = "127.0.0.1"
 PORT = 5000
@@ -30,7 +31,6 @@ def active(client):
     client.start()
     while client.is_running():
         msg = MESSAGES.get(block=True)
-        print(f"Received {msg.size} bytes")
 
 
 def passive(client):
@@ -43,11 +43,9 @@ def passive(client):
     except StopIteration as e:
         print(e)
         return
-    print(f"Receiving {size} bytes")
     total_iter = int(size / BUFF_SIZE)
     for chunk in tqdm(gen, total=total_iter):
         data.extend(chunk)
-    print(f"Completed receiving {size} bytes")
 
     # size, data = client.receive_all(4096)
     # print(f"Size = {size} | Bytes Recv = {len(data)}")

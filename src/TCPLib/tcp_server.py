@@ -41,7 +41,18 @@ class TCPServer:
 
         return client
 
+    def on_connect(self, *args, **kwargs):
+        '''
+        Overridable method that runs once the client is connected. Returning false from this method will
+        disconnect the client and abort client setup.
+        '''
+        pass
+
     def start_client_proc(self, client_id, host, port, client_soc):
+        result = self.on_connect()
+        if result is False:
+            client_soc.close()
+            return
         client_proc = ClientProcessor(client_id=client_id,
                                       host=host,
                                       port=port,
