@@ -4,8 +4,8 @@ Written by: Joshua Kitchen - 2024
 """
 import logging
 import socket
-from .logger.logger import config_logger, LogLevels, toggle_stream_handler
 
+logger = logging.getLogger(__name__)
 
 # Message flags
 COUNT = 1
@@ -15,22 +15,15 @@ DISCONNECT = 4
 
 class PassiveTcpClient:
     '''Only receives and sends data when told'''
-    def __init__(self, host, port, log_path, log_level=LogLevels.INFO):
+    def __init__(self, host, port):
         self._addr = (host, port)
         self._timeout = None
         self._is_connected = False
         self._soc = None
-        self.log_path = log_path
-        self.log_level = log_level
-        self.logger = logging.getLogger(__name__)
-        config_logger(self.logger, log_path, log_level)
 
     def _clean_up(self):
         self.disconnect(warn=False)
         self._is_connected = False
-
-    def toggle_console_logging(self):
-        toggle_stream_handler(self.logger, self.log_level)
 
     @staticmethod
     def encode_msg(data: bytes, flags: int):
@@ -85,13 +78,13 @@ class PassiveTcpClient:
             self._soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self._soc.settimeout(self._timeout)
 
-        self.logger.info(f"Connecting to {self._addr[0]} @ {self._addr[1]}")
+        logger.info("Connecting to %s @ %d", self._addr[0], self._addr[1])
 
         try:
             self._soc.connect(self._addr)
         except TimeoutError as e:
             self._clean_up()
-            self.logger.error(f"Timed out trying to connect to {self._addr[0]} @ {self._addr[1]}")
+            logger.error("Timed out trying to connect to %s @ %d", self._addr[0], self._addr[1])
             return e
         except ConnectionError as e:
             self._clean_up()
@@ -100,13 +93,12 @@ class PassiveTcpClient:
             self._clean_up()
             return e
         self._is_connected = True
-        self.logger.info(f"Connected to {self._addr[0]} @ {self._addr[1]}")
+        logger.info("Connected to %s @ %d", self._addr[0], self._addr[1])
 
     def disconnect(self, warn=True):
         """
         If warn is set to true, a disconnect message will be sent to the server.
-        WARNING: If disconnecting after an error, warn should ALWAYS be False
-        otherwise bad things will happen.
+        NOTE: When disconnecting after an error, warn should ALWAYS be False
         """
         if self._is_connected:
             if warn:
@@ -114,18 +106,18 @@ class PassiveTcpClient:
             if self._soc is not None:
                 self._soc.close()
                 self._soc = None
-            self.logger.info(f"Disconnected from {self._addr[0]} @ {self._addr[1]}")
+            logger.info("Disconnected from %s @ %d", self._addr[0], self._addr[1])
             self._is_connected = False
             return True
         return False
 
     def send_bytes(self, data: bytes):
         """
-        Send all bytes. No header creation or waiting for a report of bytes received.
+        Send all bytes unprocessed.
         """
         try:
             self._soc.sendall(data)
-            self.logger.debug(f"Sent {len(data)} bytes to {self._addr[0]} @ {self._addr[1]}")
+            logger.debug("Sent %d bytes to %s @ %d", len(data), self._addr[0], self._addr[1])
             return True
         except ConnectionAbortedError:
             self._clean_up()
@@ -135,6 +127,7 @@ class PassiveTcpClient:
             return False
         except OSError:
             self._clean_up()
+            logger.exception("Exception occurred while sending to %s @ %d", self._addr[0], self._addr[1])
             return False
         except AttributeError:  # Socket was closed from another thread
             self._clean_up()
@@ -142,7 +135,7 @@ class PassiveTcpClient:
 
     def send(self, data: bytes, flags: int = DATA):
         """
-        Send all bytes with a header
+        Send all bytes with a header attached
         """
         msg = self.encode_msg(data, flags)
         result = self.send_bytes(msg)
@@ -150,12 +143,11 @@ class PassiveTcpClient:
 
     def receive_bytes(self, size: int):
         """
-        Receive only the number of bytes specified. No header processing and no received bytes are reported.
+        Receive only the number of bytes specified.
         """
         try:
-            size = self._soc.recv(size)
-            self.logger.debug(f"Received {size} bytes from {self._addr[0]} @ {self._addr[1]}")
-            return size
+            data = self._soc.recv(size)
+            return data
         except ConnectionAbortedError:
             self._clean_up()
             return
@@ -171,15 +163,16 @@ class PassiveTcpClient:
 
     def receive(self, buff_size):
         """
-        Returns a generator for iterating over the bytes in an incoming message. First returns the size and flags, then
-        all bytes in the message.
+        Returns a generator for iterating over the bytes of an incoming message. The first item returned is the contents
+        of the header, then all other calls return the bytes of a message.
         """
         bytes_recv = 0
         header = self.receive_bytes(5)
         if not header:
             return
         size, flags = self.decode_header(header)
-        self.logger.debug(f"Incoming message from {self._addr[0]} @ {self._addr[1]}:\n\tSIZE: {size}\n\tFLAGS: {flags}")
+        logger.info("Incoming message from %s @ %d:\n\tSIZE: %d\n\tFLAGS: %d",
+                    self._addr[0], self._addr[1], size, flags)
         yield size, flags
         while bytes_recv < size:
             data = self.receive_bytes(buff_size)
@@ -205,6 +198,5 @@ class PassiveTcpClient:
             if not chunk:
                 return ()
             data.extend(chunk)
-
-        self.logger.debug(f"Received a total of {len(data)} bytes from {self._addr[0]} @ {self._addr[1]}")
+        logger.debug("Received a total of %d bytes from %s @ %d", len(data), self._addr[0], self._addr[1])
         return size, flags, data

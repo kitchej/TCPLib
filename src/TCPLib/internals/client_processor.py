@@ -7,32 +7,25 @@ import logging
 import threading
 import queue
 
-from ..logger.logger import config_logger, LogLevels
 from ..active_client import ActiveTcpClient
+
+logger = logging.getLogger(__name__)
 
 
 class ClientProcessor(ActiveTcpClient):
     '''Maintains a single client connection for the server'''
-    def __init__(self, client_id, host, port, msg_queue: queue.Queue, client_soc,
-                 log_path, log_level=LogLevels.INFO, buff_size=4096):
+    def __init__(self, client_id, host, port, msg_queue: queue.Queue, client_soc, buff_size=4096):
         ActiveTcpClient.__init__(self,
                                  host=host,
                                  port=port,
                                  msg_queue=msg_queue,
                                  client_id=client_id,
-                                 log_path=log_path,
-                                 log_level=log_level,
                                  buff_size=buff_size)
         self._client_soc = client_soc
-        self.log_path = log_path
-        self.log_level = log_level
-        self.logger = logging.getLogger(__name__)
-        config_logger(self.logger, log_path, log_level)
 
     def start(self):
         self._tcp_client.connect(self._client_soc)
         self._is_running = True
         th = threading.Thread(target=self._receive_loop)
         th.start()
-        self.logger.info(f"Processing {self._tcp_client.addr()[0]} @ {self._tcp_client.addr()[1]} "
-                         f"as client #{self._client_id}")
+        logger.info(f"Processing %s @ %d as client #%s", self.addr()[0], self.addr()[1], self._client_id)

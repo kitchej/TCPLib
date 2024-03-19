@@ -6,6 +6,12 @@ import socket
 import traceback
 
 from server_interface import ServerInterface
+import src.TCPLib.logger.logger as log_util
+
+logger = logging.getLogger()
+log_util.config_logger(logger, "Server_Log", logging.DEBUG)
+
+print("server.py, ", logger.name)
 
 
 def encode_msg(data: bytes, flags: int):
@@ -86,9 +92,7 @@ class DummyServer:
 def use_real(message):
     s = tcp_server.TCPServer(
         HOST,
-        PORT,
-        r"tests/logs\Server.log",
-        logging.DEBUG
+        PORT
     )
     s.start()
 
@@ -132,8 +136,6 @@ def use_interface():
     s.start()
     inter = ServerInterface(s)
 
-    # s.toggle_console_log()
-
     th = threading.Thread(target=inter.mainloop)
     th.start()
     th.join()
@@ -143,6 +145,6 @@ def use_interface():
 # use_dummy(video)
 
 # use_real(text)
-# use_real(video)
+use_real(video)
 
-use_interface()
+# use_interface()

@@ -51,8 +51,8 @@ class TestSendRecv:
 
         return server_copy, client_copy, server_reply, client_reply
 
-    @pytest.mark.parametrize('server', [log_folder], indirect=True)
-    @pytest.mark.parametrize('active_client', [log_folder], indirect=True)
+    @pytest.mark.parametrize('server', [[log_folder, "test-send-file"]], indirect=True)
+    @pytest.mark.parametrize('active_client', [[log_folder, "test-send-file"]], indirect=True)
     def test_send_file(self, server, active_client):
         with open(os.path.abspath(os.path.join("dummy_files", "video.mp4")), 'rb') as file:
             video = file.read()

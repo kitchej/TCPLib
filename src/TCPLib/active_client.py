@@ -7,9 +7,10 @@ import logging
 import queue
 import threading
 
-from .logger.logger import config_logger, LogLevels, toggle_stream_handler
 from .passive_client import PassiveTcpClient
 from .internals.message import Message
+
+logger = logging.getLogger(__name__)
 
 # Message flags
 COUNT = 1
@@ -18,15 +19,9 @@ DISCONNECT = 4
 
 
 class ActiveTcpClient:
-    '''Once started, always listens for messages'''
-    def __init__(self, host, port, client_id, log_path, log_level=LogLevels.INFO,
-                 msg_queue: queue.Queue = None, buff_size=4096):
-        self._tcp_client = PassiveTcpClient(
-            host=host,
-            port=port,
-            log_path=log_path,
-            log_level=log_level
-        )
+    '''Once started, connects to the host and always listens for messages'''
+    def __init__(self, host, port, client_id, msg_queue: queue.Queue = None, buff_size=4096):
+        self._tcp_client = PassiveTcpClient(host=host, port=port)
         self._is_running = False
         self._client_id = client_id
         self._buff_size = buff_size
@@ -36,19 +31,14 @@ class ActiveTcpClient:
         else:
             self._msg_queue = queue.Queue()
 
-        self.log_path = log_path
-        self.log_level = log_level
-        self.logger = logging.getLogger(__name__)
-        config_logger(self.logger, log_path, log_level)
-
     def _clean_up(self):
         self._tcp_client.disconnect(warn=False)
         self._is_running = False
 
     def _receive_loop(self):
         while self._is_running:
-            self.logger.debug(f"Client {self._client_id} is listening for new messages from "
-                              f"{self._tcp_client.addr()[0]} @ {self._tcp_client.addr()[1]}")
+            logger.debug("Client %s is listening for new messages from %s @ %d",
+                         self._client_id, self.addr()[0], self.addr()[1])
             msg = self._tcp_client.receive_all(self._buff_size)
             if not msg:
                 self._clean_up()
@@ -73,9 +63,6 @@ class ActiveTcpClient:
     def has_messages(self):
         return not self._msg_queue.empty()
 
-    def toggle_console_logging(self):
-        toggle_stream_handler(self.logger, self.log_level)
-
     def id(self):
         return self._client_id
 
@@ -99,10 +86,10 @@ class ActiveTcpClient:
         self._is_running = True
         th = threading.Thread(target=self._receive_loop)
         th.start()
-        self.logger.info(f"Active client started. Connected to {self.addr()[0]} @ {self.addr()[1]}")
+        logger.info(f"Active client started. Connected to %s @ %d",
+                    self.addr()[0], self.addr()[1])
 
     def stop(self, warn=False):
         self._is_running = False
         self._tcp_client.disconnect(warn=warn)
-        self.logger.info(f"Active client stopped. Disconnected from "
-                    f"{self.addr()[0]} @ {self.addr()[1]}")
+        logger.info(f"Active client stopped. Disconnected from %s @ %d", self.addr()[0], self.addr()[1])

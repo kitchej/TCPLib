@@ -2,15 +2,14 @@
 tcp_server.py
 Written by: Joshua Kitchen - 2024
 """
-
 import logging
 import threading
 import queue
 
-from .logger.logger import config_logger, LogLevels, toggle_stream_handler
 from .internals.listener import Listener
 from .internals.client_processor import ClientProcessor
 
+logger = logging.getLogger(__name__)
 
 # Message flags
 COUNT = 1
@@ -20,7 +19,7 @@ DISCONNECT = 4
 
 class TCPServer:
     '''Class for creating, maintaining, and transmitting data to multiple client connections.'''
-    def __init__(self, host, port, log_path, log_level=LogLevels.INFO, max_clients=0, timeout=None):
+    def __init__(self, host, port, max_clients=0, timeout=None):
         self._max_clients = max_clients
         self._connected_clients = {}
         self._connected_clients_lock = threading.Lock()
@@ -29,15 +28,7 @@ class TCPServer:
         self._listener = Listener(host=host,
                                   port=port,
                                   server_obj=self,
-                                  timeout=timeout,
-                                  log_path=log_path,
-                                  log_level=log_level)
-
-        self.log_path = log_path
-        self.log_level = log_level
-        self.console_logging = False
-        self.logger = logging.getLogger(__name__)
-        config_logger(self.logger, log_path, log_level)
+                                  timeout=timeout)
 
     def _get_client(self, client_id):
         self._connected_clients_lock.acquire()
@@ -50,29 +41,12 @@ class TCPServer:
 
         return client
 
-    def toggle_console_log(self):
-        if self.console_logging:
-            self.console_logging = False
-        else:
-            self.console_logging = True
-
-        toggle_stream_handler(self.logger, self.log_level)
-        self._listener.toggle_console_logging()
-        for client_id in self.list_clients():
-            client = self._get_client(client_id)
-            client.toggle_console_logging()
-
     def start_client_proc(self, client_id, host, port, client_soc):
         client_proc = ClientProcessor(client_id=client_id,
                                       host=host,
                                       port=port,
                                       client_soc=client_soc,
-                                      msg_queue=self._messages,
-                                      log_path=self.log_path,
-                                      log_level=self.log_level)
-
-        if self.console_logging:
-            client_proc.toggle_console_logging()
+                                      msg_queue=self._messages)
 
         client_proc.start()
         self.update_connected_clients(client_proc.id(), client_proc)
@@ -173,7 +147,7 @@ class TCPServer:
             return False
         self._is_running = True
         threading.Thread(target=self._listener.mainloop).start()
-        self.logger.info("Server has started")
+        logger.info("Server has been started")
         return True
 
     def stop(self):
@@ -185,4 +159,4 @@ class TCPServer:
                 client.stop()
             self._connected_clients.clear()
             self._connected_clients_lock.release()
-            self.logger.info("Server has been stopped")
+            logger.info("Server has been stopped")

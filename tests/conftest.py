@@ -85,11 +85,12 @@ def dummy_client():
 
 @pytest.fixture
 def server(request):
-    log_folder = request.param
+    log_folder = request.param[0]
+    log_id = request.param[1]
     s = TCPServer(
         host=HOST,
         port=PORT,
-        log_path=os.path.join(log_folder, "server_log"),
+        log_path=os.path.join(log_folder, f"server_log_{log_id}"),
         log_level=logging.DEBUG
     )
     s.start()
@@ -100,11 +101,12 @@ def server(request):
 
 @pytest.fixture
 def client(request):
-    log_folder = request.param
+    log_folder = request.param[0]
+    log_id = request.param[1]
     c = PassiveTcpClient(
         host=HOST,
         port=PORT,
-        log_path=os.path.join(log_folder, "client_log"),
+        log_path=os.path.join(log_folder, f"client_log_{log_id}"),
         log_level=logging.DEBUG
     )
     yield c
@@ -113,12 +115,13 @@ def client(request):
 
 @pytest.fixture
 def active_client(request):
-    log_folder = request.param
+    log_folder = request.param[0]
+    log_id = request.param[1]
     c = ActiveTcpClient(
         host=HOST,
         port=PORT,
         client_id="Active_Client_Standalone",
-        log_path=os.path.join(log_folder, "Active_Client_Standalone_log"),
+        log_path=os.path.join(log_folder, f"active_client_log_{log_id}"),
         log_level=logging.DEBUG
     )
     c.start()
@@ -130,11 +133,12 @@ def active_client(request):
 def client_list(request):
     log_folder = request.param[0]
     num_clients = request.param[1]
+    log_id = request.param[2]
     clients = [
         PassiveTcpClient(
             host=HOST,
             port=PORT,
-            log_path=os.path.join(log_folder, f"passive_client_{i}"),
+            log_path=os.path.join(log_folder, f"passive_client_{i}_{log_id}"),
             log_level=logging.DEBUG
         )
         for i in range(num_clients)
@@ -148,12 +152,13 @@ def client_list(request):
 def active_client_list(request):
     log_folder = request.param[0]
     num_clients = request.param[1]
+    log_id = request.param[2]
     clients = [
         ActiveTcpClient(
             host=HOST,
             port=PORT,
-            client_id=f"Client{i}",
-            log_path=os.path.join(log_folder, f"active_client_{i}"),
+            client_id=f"Client-{i}",
+            log_path=os.path.join(log_folder, f"active_client_{i}_{log_id}"),
             log_level=logging.DEBUG
         )
         for i in range(num_clients)
