@@ -7,17 +7,17 @@ import threading
 import pytest
 import time
 import socket
-import logging
 import os
 import shutil
 
-# from TCPLib.passive_client import PassiveTcpClient
-# from TCPLib.tcp_server import TCPServer
-# from TCPLib.active_client import ActiveTcpClient
+from TCPLib.passive_client import PassiveTcpClient
+from TCPLib.tcp_server import TCPServer
+from TCPLib.active_client import ActiveTcpClient
 
-from src.TCPLib.passive_client import PassiveTcpClient
-from src.TCPLib.tcp_server import TCPServer
-from src.TCPLib.active_client import ActiveTcpClient
+# from src.TCPLib.passive_client import PassiveTcpClient
+# from src.TCPLib.tcp_server import TCPServer
+# from src.TCPLib.active_client import ActiveTcpClient
+
 from tests.globals_for_tests import HOST, PORT
 
 
@@ -84,14 +84,10 @@ def dummy_client():
 
 
 @pytest.fixture
-def server(request):
-    log_folder = request.param[0]
-    log_id = request.param[1]
+def server():
     s = TCPServer(
         host=HOST,
-        port=PORT,
-        log_path=os.path.join(log_folder, f"server_log_{log_id}"),
-        log_level=logging.DEBUG
+        port=PORT
     )
     s.start()
     time.sleep(0.1)
@@ -100,49 +96,30 @@ def server(request):
 
 
 @pytest.fixture
-def client(request):
-    log_folder = request.param[0]
-    log_id = request.param[1]
+def client():
     c = PassiveTcpClient(
         host=HOST,
-        port=PORT,
-        log_path=os.path.join(log_folder, f"client_log_{log_id}"),
-        log_level=logging.DEBUG
+        port=PORT
     )
     yield c
     c.disconnect()
 
 
 @pytest.fixture
-def active_client(request):
-    log_folder = request.param[0]
-    log_id = request.param[1]
+def active_client():
     c = ActiveTcpClient(
         host=HOST,
         port=PORT,
-        client_id="Active_Client_Standalone",
-        log_path=os.path.join(log_folder, f"active_client_log_{log_id}"),
-        log_level=logging.DEBUG
+        client_id="Active_Client_Standalone"
     )
-    c.start()
     yield c
     c.stop()
 
 
 @pytest.fixture
 def client_list(request):
-    log_folder = request.param[0]
-    num_clients = request.param[1]
-    log_id = request.param[2]
-    clients = [
-        PassiveTcpClient(
-            host=HOST,
-            port=PORT,
-            log_path=os.path.join(log_folder, f"passive_client_{i}_{log_id}"),
-            log_level=logging.DEBUG
-        )
-        for i in range(num_clients)
-    ]
+    num_clients = request.param
+    clients = [PassiveTcpClient(host=HOST, port=PORT) for _ in range(num_clients)]
     yield clients
     for client in clients:
         client.disconnect()
@@ -150,19 +127,8 @@ def client_list(request):
 
 @pytest.fixture
 def active_client_list(request):
-    log_folder = request.param[0]
-    num_clients = request.param[1]
-    log_id = request.param[2]
-    clients = [
-        ActiveTcpClient(
-            host=HOST,
-            port=PORT,
-            client_id=f"Client-{i}",
-            log_path=os.path.join(log_folder, f"active_client_{i}_{log_id}"),
-            log_level=logging.DEBUG
-        )
-        for i in range(num_clients)
-    ]
+    num_clients = request.param
+    clients = [ActiveTcpClient(host=HOST, port=PORT, client_id=f"Client-{i}") for i in range(num_clients)]
     yield clients
     for client in clients:
         client.stop()

@@ -6,13 +6,11 @@ import socket
 import traceback
 
 from server_interface import ServerInterface
-import src.TCPLib.logger.logger as log_util
+import src.dev_tools.logger as log_util
 
 logger = logging.getLogger()
-log_util.config_logger(logger, "Server_Log", logging.INFO)
+log_util.config_logger(logger, "src\\dev_tools\\logs\\Server_Log", logging.INFO)
 log_util.toggle_stream_handler(logger, logging.INFO)
-
-print("server.py, ", logger.name)
 
 
 def encode_msg(data: bytes, flags: int):
@@ -131,9 +129,7 @@ def use_interface():
         "192.168.0.2",
         PORT
     )
-    s.start()
-    inter = ServerInterface(s)
-
+    inter = ServerInterface(s, auto_start=True)
     th = threading.Thread(target=inter.mainloop)
     th.start()
     th.join()
@@ -143,6 +139,6 @@ def use_interface():
 # use_dummy(video)
 
 # use_real(text)
-use_real(video)
+# use_real(video)
 
-# use_interface()
+use_interface()

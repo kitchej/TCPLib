@@ -2,14 +2,12 @@ import logging
 
 from src.TCPLib.active_client import ActiveTcpClient
 from src.TCPLib.passive_client import PassiveTcpClient
-import src.TCPLib.logger.logger as log_util
-import threading
-import time
+import src.dev_tools.logger as log_util
 from tqdm import tqdm
 import queue
 
 logger = logging.getLogger()
-log_util.config_logger(logger, "Client_Log", logging.INFO)
+log_util.config_logger(logger, "../../Client_Log", logging.INFO)
 log_util.toggle_stream_handler(logger, logging.INFO)
 
 HOST = "127.0.0.1"

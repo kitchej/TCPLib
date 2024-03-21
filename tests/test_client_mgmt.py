@@ -4,8 +4,11 @@ Written by: Joshua Kitchen - 2024
 """
 import pytest
 import time
+import logging
+import os
 
-from tests.globals_for_tests import setup_log_folder, HOST, PORT
+from tests.globals_for_tests import setup_log_folder
+from src.dev_tools.logger import change_log_path
 
 """
 TO TEST:
@@ -14,16 +17,18 @@ TO TEST:
 - 
 """
 
+logger = logging.getLogger()
+log_folder = setup_log_folder("TestClientMgmt")
+
 
 class TestClientMgmt:
-    log_folder = setup_log_folder("TestClientMgmt")
 
-    @pytest.mark.parametrize('client_list', [[log_folder, 11, "test-server-limits"]], indirect=True)
-    @pytest.mark.parametrize('server', [[log_folder, "test-server-limits"]], indirect=True)
+    @pytest.mark.parametrize('client_list', [11], indirect=True)
     def test_server_limits(self, server, client_list):
         """
         10 clients should connect and the 11th should be denied connection
         """
+        change_log_path(logger, os.path.join(log_folder, "test_server_limits.log"), logging.DEBUG)
         server.set_max_clients(10)
         last_client = client_list.pop()
 
@@ -36,13 +41,3 @@ class TestClientMgmt:
         last_client.connect()
         time.sleep(0.1)
         assert not last_client.is_connected()
-
-        for client in server.list_clients():
-            server.disconnect_client(client)
-
-        assert server.client_count() == 0
-
-    @pytest.mark.parametrize('client_list', [[log_folder, 11, "test-gen"]], indirect=True)
-    @pytest.mark.parametrize('server', [[log_folder, "test-gen"]], indirect=True)
-    def test_gen(self, server, client_list):
-        assert True

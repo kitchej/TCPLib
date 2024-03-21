@@ -3,10 +3,15 @@ import sys
 import os
 from pynput import keyboard
 import threading
+import logging
+
+from logger import toggle_stream_handler
+
+logger = logging.getLogger(__name__)
 
 
 class ServerInterface:
-    def __init__(self, server_obj, auto_start=True):
+    def __init__(self, server_obj, auto_start=False):
         self._console_logging = False
         self._console_logging_lock = threading.Lock()
         self.server_obj = server_obj
@@ -15,7 +20,7 @@ class ServerInterface:
         self.commands = {
             "quit": self.quit,
             "help": self.list_commands,
-            "log": self.toggle_console_logging,
+            "logMode": self.toggle_console_logging,
             "info": self.info,
             "shutdown": self.shutdown_server,
             "restart": self.restart_server,
@@ -70,7 +75,7 @@ class ServerInterface:
             "quit - exit the program. If a server is running, it will be shutdown\n"
             "help - list all available commands\n"
             "info - list general information about the server\n"
-            "log - print logged messages to the console\n"
+            "logMode - prints logged messages to the console. Press 'esc' to exit log mode\n"
             "start - starts the server\n"
             "shutdown - shuts down the server\n"
             "restart - restarts the server\n"
@@ -83,7 +88,7 @@ class ServerInterface:
 
     def toggle_console_logging(self, args):
         self._console_logging = True
-        self.server_obj.toggle_console_log()
+        toggle_stream_handler(logger, logging.INFO)
         with keyboard.Listener(on_press=self._on_press) as listener:
             while self._is_logging_to_console():
                 pass
@@ -102,7 +107,7 @@ class ServerInterface:
         if self.server_obj.is_running():
             confirm = input("Are you sure you want to shut down the server? y/n: ")
             if confirm == 'y':
-                self.server_obj.close()
+                self.server_obj.stop()
                 print("Server has been shutdown")
             else:
                 return

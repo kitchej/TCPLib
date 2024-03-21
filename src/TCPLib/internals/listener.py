@@ -6,6 +6,7 @@ import logging
 import random
 import socket
 
+from .utils import encode_msg
 
 logger = logging.getLogger(__name__)
 
@@ -60,8 +61,10 @@ class Listener:
                 if self._server_obj.is_full():
                     logger.debug("%s @ %d was denied connection due to server being full",
                                  client_addr[0], client_addr[1])
+                    client_soc.sendall(encode_msg(b'0', 4))
                     client_soc.close()
                     continue
+                client_soc.sendall(encode_msg(b'0', 2))
                 self._server_obj.start_client_proc(self._generate_client_id(),
                                                    client_addr[0],
                                                    client_addr[1],

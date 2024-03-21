@@ -5,6 +5,8 @@ Written by: Joshua Kitchen - 2024
 import logging
 import socket
 
+from .internals.utils import encode_msg, decode_header
+
 logger = logging.getLogger(__name__)
 
 # Message flags
@@ -24,36 +26,6 @@ class PassiveTcpClient:
     def _clean_up(self):
         self.disconnect(warn=False)
         self._is_connected = False
-
-    @staticmethod
-    def encode_msg(data: bytes, flags: int):
-        """
-        MSG STRUCTURE:
-        [Header: 5 bytes] [Data: inf bytes]
-
-        HEADER STRUCTURE:
-        [Size: 4 bytes] [Flags: 1 Byte -> 1 ----
-                                          1     |
-                                          1     | --- CURRENTLY UNUSED
-                                          1     |
-                                          1 ____
-                                          1: DISCONNECTING
-                                          1: TRANSMITTING DATA
-                                          1: REPORTING BYTES RECEIVED]
-        """
-        msg = bytearray()
-        size = len(data).to_bytes(4, byteorder='big')
-        flags = flags.to_bytes(1, byteorder='big')
-        msg.extend(size)
-        msg.extend(flags)
-        msg.extend(data)
-        return msg
-
-    @staticmethod
-    def decode_header(header: bytes):
-        size = int.from_bytes(header[0:4], byteorder='big')
-        flags = int.from_bytes(header[4:5], byteorder='big')
-        return size, flags
 
     def is_connected(self):
         return self._is_connected
@@ -82,6 +54,11 @@ class PassiveTcpClient:
 
         try:
             self._soc.connect(self._addr)
+            confirm_conn = self._soc.recv(6)
+            _, flags = decode_header(confirm_conn[:5])
+            if flags == 4:
+                self._soc.close()
+                return False
         except TimeoutError as e:
             self._clean_up()
             logger.error("Timed out trying to connect to %s @ %d", self._addr[0], self._addr[1])
@@ -94,6 +71,7 @@ class PassiveTcpClient:
             return e
         self._is_connected = True
         logger.info("Connected to %s @ %d", self._addr[0], self._addr[1])
+        return True
 
     def disconnect(self, warn=True):
         """
@@ -102,7 +80,7 @@ class PassiveTcpClient:
         """
         if self._is_connected:
             if warn:
-                self.send_bytes(self.encode_msg(b'', DISCONNECT))
+                self.send_bytes(encode_msg(b'', DISCONNECT))
             if self._soc is not None:
                 self._soc.close()
                 self._soc = None
@@ -137,7 +115,7 @@ class PassiveTcpClient:
         """
         Send all bytes with a header attached
         """
-        msg = self.encode_msg(data, flags)
+        msg = encode_msg(data, flags)
         result = self.send_bytes(msg)
         return result
 
@@ -170,7 +148,7 @@ class PassiveTcpClient:
         header = self.receive_bytes(5)
         if not header:
             return
-        size, flags = self.decode_header(header)
+        size, flags = decode_header(header)
         logger.info("Incoming message from %s @ %d:\n\tSIZE: %d\n\tFLAGS: %d",
                     self._addr[0], self._addr[1], size, flags)
         yield size, flags

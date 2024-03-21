@@ -3,8 +3,8 @@ logger.py
 Written by Joshua Kitchen - 2024
 
 NOTE: This module was intended to be used for developing and debugging the library. If you want the library to log
-messages, you must create and configure a root logger in your application with logging.getLogger().
-This is all you have to do, The library will automatically get and log messages to your logger.
+messages, you must create and configure a root logger in your application. This is all you have to do, as the library
+will automatically get and log messages to your logger.
 """
 
 import logging
@@ -21,7 +21,11 @@ INFO_FORMATTER = logging.Formatter(
 )
 
 
-def config_logger(logger, log_path, log_level):
+def change_log_path(logger, log_path, log_level):
+    for handler in logger.handlers:
+        if handler.name == "TCPLibFileHandler":
+            logger.removeHandler(handler)
+
     file_handler = logging.FileHandler(log_path, mode='w')
     file_handler.set_name("TCPLibFileHandler")
     file_handler.setLevel(log_level)

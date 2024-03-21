@@ -1,13 +1,19 @@
 import time
 import pytest
+import logging
+import os
+
 from tests.globals_for_tests import setup_log_folder, HOST, PORT
+from src.dev_tools.logger import change_log_path
+
+
+logger = logging.getLogger()
+log_folder = setup_log_folder("TestLibState")
 
 
 class TestLibState:
-    log_folder = setup_log_folder("TestLibState")
-
-    @pytest.mark.parametrize('server', [[log_folder, "test-server-state"]], indirect=True)
     def test_server_state(self, dummy_client, server):
+        change_log_path(logger, os.path.join(log_folder, "test_server_state.log"), logging.DEBUG)
         assert server.addr() == (HOST, PORT)
         assert server.is_running() is True
         assert server.is_full() is False
@@ -50,8 +56,8 @@ class TestLibState:
         assert server.is_running() is False
         assert server._listener._soc is None
 
-    @pytest.mark.parametrize('client', [[log_folder, "test-passive-client-state"]], indirect=True)
     def test_passive_client_state(self, dummy_server, client):
+        change_log_path(logger, os.path.join(log_folder, "test_passive_client_state.log"), logging.DEBUG)
         assert client.timeout() is None
         assert client.is_connected() is False
 
@@ -69,13 +75,12 @@ class TestLibState:
         assert client.addr() == (HOST, PORT)
         assert client.is_connected() is False
 
-    @pytest.mark.parametrize('active_client', [[log_folder, "test-active-client-state"]], indirect=True)
     def test_active_client_state(self, dummy_server, active_client):
+        change_log_path(logger, os.path.join(log_folder, "test_active_client_state.log"), logging.DEBUG)
         assert not active_client.has_messages()
         assert active_client.id() == active_client._client_id
         assert active_client.addr() == (HOST, PORT)
         assert active_client.timeout() is None
-        time.sleep(0.1)  # For some reason if this isn't here, the below assertion will fail
         assert active_client.is_running() is False
 
         active_client.set_timeout(10)

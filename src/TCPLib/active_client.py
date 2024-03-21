@@ -36,13 +36,12 @@ class ActiveTcpClient:
         self._is_running = False
 
     def _receive_loop(self):
+        logger.debug("Client %s is listening for new messages from %s @ %d",
+                     self._client_id, self.addr()[0], self.addr()[1])
         while self._is_running:
-            logger.debug("Client %s is listening for new messages from %s @ %d",
-                         self._client_id, self.addr()[0], self.addr()[1])
             msg = self._tcp_client.receive_all(self._buff_size)
             if not msg:
-                self._clean_up()
-                return
+                continue
             size, flags, data = msg[0], msg[1], msg[2]
             self._msg_queue.put(Message(self._client_id, size, flags, data))
             if flags == 4:
@@ -82,12 +81,17 @@ class ActiveTcpClient:
         return self._is_running
 
     def start(self):
-        self._tcp_client.connect()
+        if self._is_running:
+            return False
+        result = self._tcp_client.connect()
+        if not result or isinstance(result, Exception):
+            return result
         self._is_running = True
         th = threading.Thread(target=self._receive_loop)
         th.start()
         logger.info(f"Active client started. Connected to %s @ %d",
                     self.addr()[0], self.addr()[1])
+        return result
 
     def stop(self, warn=False):
         self._is_running = False
