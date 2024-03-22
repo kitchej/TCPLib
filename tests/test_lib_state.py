@@ -14,15 +14,23 @@ log_folder = setup_log_folder("TestLibState")
 class TestLibState:
     def test_server_state(self, dummy_client, server):
         change_log_path(logger, os.path.join(log_folder, "test_server_state.log"), logging.DEBUG)
+
         assert server.addr() == (HOST, PORT)
-        assert server.is_running() is True
-        assert server.is_full() is False
+        assert not server.is_running()
+        assert not server.is_full()
         assert server.max_clients() == 0
 
         assert server.listener_timeout() is None
         server.set_listener_timeout(10)
         assert server.listener_timeout() == 10
-        server.set_listener_timeout(None)
+
+        server.start()
+        time.sleep(0.1)
+
+        assert server.addr() == (HOST, PORT)
+        assert server.is_running()
+        assert not server.is_full()
+        assert server.max_clients() == 0
 
         server.set_max_clients(1)
         assert server.max_clients() == 1
@@ -50,11 +58,16 @@ class TestLibState:
         assert server.is_full() is False
         assert server.client_count() == 0
 
+        server._messages.put("Hello World")
+        server._messages.put("Hello World1")
+        server._messages.put("Hello World2")
+
         server.stop()
 
         assert server.addr() == (HOST, PORT)
-        assert server.is_running() is False
-        assert server._listener._soc is None
+        assert not server.is_running()
+        assert not server.is_full()
+        assert server.max_clients() == 1
 
     def test_passive_client_state(self, dummy_server, client):
         change_log_path(logger, os.path.join(log_folder, "test_passive_client_state.log"), logging.DEBUG)

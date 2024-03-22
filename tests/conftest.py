@@ -89,7 +89,6 @@ def server():
         host=HOST,
         port=PORT
     )
-    s.start()
     time.sleep(0.1)
     yield s
     s.stop()

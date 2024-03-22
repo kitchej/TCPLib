@@ -32,6 +32,9 @@ class TestClientMgmt:
         server.set_max_clients(10)
         last_client = client_list.pop()
 
+        server.start()
+        time.sleep(0.1)
+
         for client in client_list:
             client.connect()
         time.sleep(0.1)

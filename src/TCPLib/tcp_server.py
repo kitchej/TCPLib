@@ -41,6 +41,11 @@ class TCPServer:
 
         return client
 
+    def _update_connected_clients(self, client_id: str, client: ClientProcessor):
+        self._connected_clients_lock.acquire()
+        self._connected_clients.update({client_id: client})
+        self._connected_clients_lock.release()
+
     def _on_connect(self, *args, **kwargs):
         '''
         Overridable method that runs once the client is connected. Returning false from this method will
@@ -60,12 +65,7 @@ class TCPServer:
                                       msg_queue=self._messages)
 
         client_proc.start()
-        self.update_connected_clients(client_proc.id(), client_proc)
-
-    def update_connected_clients(self, client_id: str, client: ClientProcessor):
-        self._connected_clients_lock.acquire()
-        self._connected_clients.update({client_id: client})
-        self._connected_clients_lock.release()
+        self._update_connected_clients(client_proc.id(), client_proc)
 
     def addr(self):
         return self._listener.addr()
@@ -77,14 +77,12 @@ class TCPServer:
         self._connected_clients_lock.acquire()
         count = len(self._connected_clients.keys())
         self._connected_clients_lock.release()
-
         return count
 
     def is_full(self):
         if self._max_clients > 0:
             if self.client_count() == self._max_clients:
                 return True
-
         return False
 
     def max_clients(self):
@@ -160,6 +158,7 @@ class TCPServer:
         threading.Thread(target=self._listener.mainloop).start()
         logger.info("Server has been started")
         return True
+
 
     def stop(self):
         if self._is_running:
