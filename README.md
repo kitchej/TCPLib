@@ -2,7 +2,7 @@
 
 ---
 
-NOTE: This library should not be considered a secure way to transmit data. It is provided as-is and should be used at your own risk. Data is transmitted as-is, so any senstive data should be secured before being sent over public networks.
+**NOTE: This library should not be considered a secure way to transmit data. Data is transmitted as-is, so any senstive data should be secured before being sent over public networks. Use at your own risk!**
 
 TCPLib is a library for setting up a simple TCP clinet and server. All data is sent as bytes, therefore data must be converted to a ```bytes()``` or ```bytearray()``` object before sending.
 
