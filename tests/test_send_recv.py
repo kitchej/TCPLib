@@ -1,88 +1,124 @@
+"""
+test_send_recv.py
+Written by: Joshua Kitchen - 2024
+"""
+import queue
 import time
-import threading
+import pytest
 import os
+import logging
+import threading
 
-from tests.fixtures import dummy_client, dummy_server, server, client, HOST, PORT
-
-
-def recv(c, out: dict):
-    msg = c.receive()
-    out.update({"size": msg[0]})
-    out.update({"flags": msg[1]})
-    out.update({"data": msg[2]})
+from tests.globals_for_tests import setup_log_folder
+from dev_tools.log_util import add_file_handler
 
 
-def echo(client, server, data):
-    time.sleep(0.1)
-    client.connect(HOST, PORT)
-    server_reply = client.send(data)
-
-    msg = server.pop_msg()
-
-    echo_msg = {}
-    recv_th = threading.Thread(target=recv, args=[client, echo_msg])
-    recv_th.start()
-
-    time.sleep(1)
-
-    client_reply = server.send(msg.client_id, msg.data)
-
-    return server_reply, client_reply, echo_msg
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+log_folder = setup_log_folder("TestSendRecv")
 
 
-def test_send_text(server, client):
-    with open(os.path.join("tests", "dummy_files", "doi.txt"), 'rb') as file:
-        text = file.read()
+class TestSendRecv:
+    @staticmethod
+    def send(client, id, data, completed_q):
+        client.send(data)
+        completed_q.put(f"{id} SENT")
 
-    server_reply, client_reply, msg = echo(client, server, text)
-    time.sleep(0.1)
+    @staticmethod
+    def echo(client, server, data):
+        time.sleep(0.1)
+        server_client_id = server.list_clients()[0]
 
-    assert server_reply == (4, 1, len(text).to_bytes(4, byteorder='little'))
-    assert client_reply == (4, 1, len(text).to_bytes(4, byteorder='little'))
+        client.send(data)
+        server_copy = server.pop_msg(block=True)
+        server_reply = client.pop_msg(block=True)
+        server.send(server_client_id, server_copy.data)
 
-    assert msg["size"] == len(text)
-    assert msg["flags"] == 2
-    assert msg["data"] == text
+        client_copy = client.pop_msg(block=True)
+        client_reply = server.pop_msg(block=True)
 
-    client.disconnect()
+        server_copy = {
+            "size": server_copy.size,
+            "flags": server_copy.flags,
+            "data": server_copy.data
+        }
 
+        client_copy = {
+            "size": client_copy.size,
+            "flags": client_copy.flags,
+            "data": client_copy.data
+        }
 
-def test_send_photo(server, client):
-    with open(os.path.join("tests", "dummy_files", "photo.jpg"), 'rb') as file:
-        photo = file.read()
+        server_reply = {
+            "size": server_reply.size,
+            "flags": server_reply.flags,
+            "data": server_reply.data
+        }
 
-    server_reply, client_reply, msg = echo(client, server, photo)
-    time.sleep(0.1)
+        client_reply = {
+            "size": client_reply.size,
+            "flags": client_reply.flags,
+            "data": client_reply.data
+        }
+        return server_copy, client_copy, server_reply, client_reply
 
-    assert server_reply == (4, 1, len(photo).to_bytes(4, byteorder='little'))
-    assert client_reply == (4, 1, len(photo).to_bytes(4, byteorder='little'))
+    def test_send_file(self, server, active_client):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_send_file.log"),
+                         logging.DEBUG,
+                         "test_send_file-filehandler")
+        with open(os.path.abspath(os.path.join("dummy_files", "video.mp4")), 'rb') as file:
+            video = file.read()
 
-    assert msg["size"] == len(photo)
-    assert msg["flags"] == 2
-    assert msg["data"] == photo
+        server.start()
+        time.sleep(0.1)
+        active_client.start()
+        time.sleep(0.1)
 
-    client.disconnect()
+        server_msg, client_msg, server_reply, client_reply = self.echo(active_client, server, video)
 
+        assert server_msg["size"] == len(video)
+        assert server_msg["flags"] == 2
+        assert server_msg["data"] == video
 
-def test_send_video(server, client):
-    buff_size = 16384
+        assert client_msg["size"] == len(video)
+        assert client_msg["flags"] == 2
+        assert client_msg["data"] == video
 
-    with open(os.path.join("tests", "dummy_files", "video.mp4"), 'rb') as file:
-        video = file.read()
+        assert server_reply["size"] == 4
+        assert server_reply["flags"] == 1
+        assert server_reply["data"] == int.to_bytes(len(video), byteorder='big', length=4)
 
-    client.set_buff_size(buff_size)
-    server.set_default_buff_size(buff_size)
+        assert client_reply["size"] == 4
+        assert client_reply["flags"] == 1
+        assert client_reply["data"] == int.to_bytes(len(video), byteorder='big', length=4)
 
-    echo(client, server, video)
+    @pytest.mark.parametrize('client_list', [20], indirect=True)
+    def test_send_file_multi_client(self, client_list, server):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_send_file_multi_client.log"),
+                         logging.DEBUG,
+                         "test_send_file_multi_client-filehandler")
+        with open(os.path.abspath(os.path.join("dummy_files", "photo.jpg")), 'rb') as file:
+            photo = file.read()
 
-    server_reply, client_reply, msg = echo(client, server, video)
-    time.sleep(0.1)
+        completed = queue.Queue()
 
-    assert server_reply == (4, 1, len(video).to_bytes(4, byteorder='little'))
-    assert client_reply == (4, 1, len(video).to_bytes(4, byteorder='little'))
+        server.start()
+        time.sleep(0.1)
+        threads = []
+        for i, c in enumerate(client_list):
+            c.connect()
+            threads.append(threading.Thread(target=self.send, args=[c, i, photo, completed]))
 
-    assert msg["size"] == len(video)
-    assert msg["flags"] == 2
-    assert msg["data"] == video
+        for thread in threads:
+            thread.start()
 
-    client.disconnect()
+        # Wait for all msgs to be sent
+        for i in range(20):
+            completed.get(block=True)
+
+        assert server.has_messages()
+
+        for msg in server.get_all_msg():
+            assert msg.data == photo

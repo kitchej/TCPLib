@@ -1,13 +1,18 @@
+"""
+listener.py
+Written by: Joshua Kitchen - 2024
+"""
 import logging
-import threading
 import random
 import socket
 
-from TCPLib.internals.client_processor import ClientProcessor
-logging.getLogger(__name__)
+from .utils import encode_msg
+
+logger = logging.getLogger(__name__)
 
 
 class Listener:
+    '''Listens for and accepts new client connections for the server'''
     def __init__(self, host, port, server_obj, timeout=None):
         self._addr = (host, port)
         self._soc = None
@@ -36,8 +41,8 @@ class Listener:
         self._soc.settimeout(self._timeout)
         try:
             self._soc.bind(self._addr)
-        except socket.gaierror as e:
-            logging.exception(f"SERVER: Exception when trying to bind to {self._addr[0]} @ {self._addr[1]}", e)
+        except socket.gaierror:
+            logger.exception(f"Exception when trying to bind to %s @ %d", self._addr[0], self._addr[1])
             return False
         return True
 
@@ -47,24 +52,21 @@ class Listener:
 
     def mainloop(self):
         while self._server_obj.is_running():
-            logging.debug("SERVER: Listening for new connections...")
             try:
                 self._soc.listen()
                 client_soc, client_addr = self._soc.accept()
+                logger.info("Accepted Connection from %s @ %d", client_addr[0], client_addr[1])
                 if self._server_obj.is_full():
+                    logger.debug("%s @ %d was denied connection due to server being full",
+                                 client_addr[0], client_addr[1])
+                    client_soc.sendall(encode_msg(b'0', 4))
                     client_soc.close()
                     continue
-                processor = ClientProcessor(client_id=self._generate_client_id(),
-                                            host=client_addr[0],
-                                            port=client_addr[1],
-                                            client_soc=client_soc,
-                                            server_obj=self._server_obj)
-                proc_th = threading.Thread(target=processor.process_client)
-                proc_th.start()
-                self._server_obj.update_connected_clients(processor.id(), processor)
-                logging.info(f"SERVER: Client at {processor.addr()[0]} @ {processor.addr()[1]} was connected")
-            except OSError as e:
-                logging.debug("Exception", exc_info=e)
-                logging.info("Server shutdown")
+                client_soc.sendall(encode_msg(b'0', 2))
+                self._server_obj.start_client_proc(self._generate_client_id(),
+                                                   client_addr[0],
+                                                   client_addr[1],
+                                                   client_soc)
+            except OSError:
+                logger.exception(f"Exception occurred while listening on %s @ %d", self._addr[0], self._addr[1])
                 break
-        logging.info("Server shutdown")

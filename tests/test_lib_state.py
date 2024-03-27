@@ -1,100 +1,128 @@
-"""
-TEST STATE SERVER
-    - addr
-    - is_running
-    - client_count
-    - is_full
-    - max_clients
-    - set_max_clients
-    - list_clients
-    - edit_client_prop
-    - get_client_info
-
-TEST STATE TCP_OBJ
-    - encode_msg
-    - decode_header
-    - is_connected
-    - default_buff_size
-    - set_default_buff_size
-    - timeout
-    - set_timeout
-    - addr
-"""
 import time
+import logging
+import os
 
-from tests.fixtures import dummy_client, dummy_server, server, client, HOST, PORT
+from tests.globals_for_tests import setup_log_folder, HOST, PORT
+from dev_tools.log_util import add_file_handler
 
-
-def test_server_state(dummy_client, server):
-    assert server.addr() == (HOST, PORT)
-    assert server.is_running() is True
-    assert server.is_full() is False
-    assert server.max_clients() == 0
-    assert server.default_buff_size() == 4096
-
-    assert server.listener_timeout() is None
-    server.set_listener_timeout(10)
-    assert server.listener_timeout() == 10
-    server.set_listener_timeout(None)
-
-    server.set_max_clients(1)
-    assert server.max_clients() == 1
-
-    dummy_client.connect((HOST, PORT))
-    time.sleep(0.1)
-    assert server.client_count() == 1
-    assert server.is_full() is True
-
-    assert server.list_clients()
-    client = server.list_clients()[0]
-
-    client_info = server.get_client_info(client)
-
-    try:
-        assert client_info["is_connected"] is True
-        assert client_info["addr"][0] == HOST
-        assert client_info["timeout"] is None
-        assert client_info["buff_size"] == 4096
-    except KeyError:
-        assert False
-
-    server.edit_client_prop(client, timeout=10, buff_size=2048)
-    client_info = server.get_client_info(client)
-
-    try:
-        assert client_info["is_connected"] is True
-        assert client_info["addr"][0] == HOST
-        assert client_info["timeout"] == 10
-        assert client_info["buff_size"] == 2048
-    except KeyError:
-        assert False
-
-    server.disconnect_client(client)
-
-    assert server.is_full() is False
-    assert server.client_count() == 0
-
-    server.close()
-
-    assert server.addr() == (HOST, PORT)
-    assert server.is_running() is False
-    assert server._listener._soc is None
-    assert server.default_buff_size() == 4096
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+log_folder = setup_log_folder("TestLibState")
 
 
-def test_client_state(dummy_server, client):
-    assert client.timeout() is None
-    assert client.buff_size() == 4096
-    assert client.is_connected() is False
-    assert client.query_progress() is False
+class TestLibState:
+    def test_server_state(self, dummy_client, server):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_server_state.log"),
+                         logging.DEBUG,
+                         "test_server_state-filehandler")
 
-    client.connect(HOST, PORT)
-    time.sleep(0.1)
+        assert server.addr() == (HOST, PORT)
+        assert not server.is_running()
+        assert not server.is_full()
+        assert server.max_clients() == 0
 
-    assert client.addr() == (HOST, PORT)
-    assert client.is_connected() is True
+        assert server.listener_timeout() is None
+        server.set_listener_timeout(10)
+        assert server.listener_timeout() == 10
 
-    client.disconnect()
+        server.start()
+        time.sleep(0.1)
 
-    assert client.addr() == (HOST, PORT)
-    assert client.is_connected() is False
+        assert server.addr() == (HOST, PORT)
+        assert server.is_running()
+        assert not server.is_full()
+        assert server.max_clients() == 0
+
+        server.set_max_clients(1)
+        assert server.max_clients() == 1
+
+        dummy_client.connect((HOST, PORT))
+        time.sleep(0.1)
+        assert server.client_count() == 1
+        assert server.is_full() is True
+
+        assert server.list_clients()
+        conn_client = server.list_clients()[0]
+
+        client_proc = server._get_client(conn_client)
+        client_info = server.get_client_info(conn_client)
+
+        try:
+            assert client_info["is_running"] is True
+            assert client_info["host"] == HOST
+            assert client_info["port"] == client_proc._tcp_client._addr[1]
+        except KeyError:
+            assert False
+
+        server.disconnect_client(conn_client)
+
+        assert server.is_full() is False
+        assert server.client_count() == 0
+
+        server._messages.put("Hello World")
+        server._messages.put("Hello World1")
+        server._messages.put("Hello World2")
+
+        server.stop()
+
+        assert server.addr() == (HOST, PORT)
+        assert not server.is_running()
+        assert not server.is_full()
+        assert server.max_clients() == 1
+
+    def test_passive_client_state(self, dummy_server, client):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_passive_client_state.log"),
+                         logging.DEBUG,
+                         "test_passive_client_state-filehandler")
+        assert client.timeout() is None
+        assert client.is_connected() is False
+
+        client.set_timeout(10)
+        assert client.timeout() == 10
+
+        client.connect()
+        time.sleep(0.1)
+
+        assert client.addr() == (HOST, PORT)
+        assert client.is_connected() is True
+
+        client.disconnect()
+
+        assert client.addr() == (HOST, PORT)
+        assert client.is_connected() is False
+
+    def test_active_client_state(self, dummy_server, active_client):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_active_client_state.log"),
+                         logging.DEBUG,
+                         "test_active_client_state-filehandler")
+        assert not active_client.has_messages()
+        assert active_client.id() == active_client._client_id
+        assert active_client.addr() == (HOST, PORT)
+        assert active_client.timeout() is None
+        assert active_client.is_running() is False
+
+        active_client.set_timeout(10)
+        assert active_client.timeout() == 10
+
+        active_client.start()
+        time.sleep(0.1)
+
+        assert active_client.is_running() is True
+
+        active_client._msg_queue.put("Hello World")
+        active_client._msg_queue.put("Hello World1")
+        active_client._msg_queue.put("Hello World2")
+
+        assert active_client.has_messages()
+        msg0 = active_client.pop_msg()
+
+        assert msg0 == "Hello World"
+
+        remaining_msgs = [msg for msg in active_client.get_all_msg()]
+
+        assert len(remaining_msgs) == 2
+        assert remaining_msgs[0] == "Hello World1"
+        assert remaining_msgs[1] == "Hello World2"
