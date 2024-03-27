@@ -10,7 +10,9 @@ import threading
 from .passive_client import PassiveTcpClient
 from .internals.message import Message
 
+
 logger = logging.getLogger(__name__)
+
 
 # Message flags
 COUNT = 1

@@ -1,19 +1,21 @@
 import time
-import pytest
 import logging
 import os
 
 from tests.globals_for_tests import setup_log_folder, HOST, PORT
-from src.dev_tools.logger import change_log_path
-
+from dev_tools.log_util import add_file_handler
 
 logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
 log_folder = setup_log_folder("TestLibState")
 
 
 class TestLibState:
     def test_server_state(self, dummy_client, server):
-        change_log_path(logger, os.path.join(log_folder, "test_server_state.log"), logging.DEBUG)
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_server_state.log"),
+                         logging.DEBUG,
+                         "test_server_state-filehandler")
 
         assert server.addr() == (HOST, PORT)
         assert not server.is_running()
@@ -41,10 +43,10 @@ class TestLibState:
         assert server.is_full() is True
 
         assert server.list_clients()
-        client = server.list_clients()[0]
+        conn_client = server.list_clients()[0]
 
-        client_proc = server._get_client(client)
-        client_info = server.get_client_info(client)
+        client_proc = server._get_client(conn_client)
+        client_info = server.get_client_info(conn_client)
 
         try:
             assert client_info["is_running"] is True
@@ -53,7 +55,7 @@ class TestLibState:
         except KeyError:
             assert False
 
-        server.disconnect_client(client)
+        server.disconnect_client(conn_client)
 
         assert server.is_full() is False
         assert server.client_count() == 0
@@ -70,7 +72,10 @@ class TestLibState:
         assert server.max_clients() == 1
 
     def test_passive_client_state(self, dummy_server, client):
-        change_log_path(logger, os.path.join(log_folder, "test_passive_client_state.log"), logging.DEBUG)
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_passive_client_state.log"),
+                         logging.DEBUG,
+                         "test_passive_client_state-filehandler")
         assert client.timeout() is None
         assert client.is_connected() is False
 
@@ -89,7 +94,10 @@ class TestLibState:
         assert client.is_connected() is False
 
     def test_active_client_state(self, dummy_server, active_client):
-        change_log_path(logger, os.path.join(log_folder, "test_active_client_state.log"), logging.DEBUG)
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_active_client_state.log"),
+                         logging.DEBUG,
+                         "test_active_client_state-filehandler")
         assert not active_client.has_messages()
         assert active_client.id() == active_client._client_id
         assert active_client.addr() == (HOST, PORT)

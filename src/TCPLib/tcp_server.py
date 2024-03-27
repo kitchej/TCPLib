@@ -62,7 +62,8 @@ class TCPServer:
                                       host=host,
                                       port=port,
                                       client_soc=client_soc,
-                                      msg_queue=self._messages)
+                                      msg_queue=self._messages,
+                                      server_obj=self)
 
         client_proc.start()
         self._update_connected_clients(client_proc.id(), client_proc)
@@ -137,7 +138,7 @@ class TCPServer:
             yield self.pop_msg(block=block)
 
     def has_messages(self):
-        return self._messages.empty()
+        return not self._messages.empty()
 
     def send(self, client_id: str, data: bytes):
         self._connected_clients_lock.acquire()
@@ -158,7 +159,6 @@ class TCPServer:
         threading.Thread(target=self._listener.mainloop).start()
         logger.info("Server has been started")
         return True
-
 
     def stop(self):
         if self._is_running:

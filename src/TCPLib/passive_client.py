@@ -7,7 +7,9 @@ import socket
 
 from .internals.utils import encode_msg, decode_header
 
+
 logger = logging.getLogger(__name__)
+
 
 # Message flags
 COUNT = 1

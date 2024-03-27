@@ -2,6 +2,7 @@
 test_send_recv.py
 Written by: Joshua Kitchen - 2024
 """
+import queue
 import time
 import pytest
 import os
@@ -9,13 +10,20 @@ import logging
 import threading
 
 from tests.globals_for_tests import setup_log_folder
-from src.dev_tools.logger import change_log_path
+from dev_tools.log_util import add_file_handler
+
 
 logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
 log_folder = setup_log_folder("TestSendRecv")
 
 
 class TestSendRecv:
+    @staticmethod
+    def send(client, id, data, completed_q):
+        client.send(data)
+        completed_q.put(f"{id} SENT")
+
     @staticmethod
     def echo(client, server, data):
         time.sleep(0.1)
@@ -55,7 +63,10 @@ class TestSendRecv:
         return server_copy, client_copy, server_reply, client_reply
 
     def test_send_file(self, server, active_client):
-        change_log_path(logger, os.path.join(log_folder, "test_send_file.log"), logging.DEBUG)
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_send_file.log"),
+                         logging.DEBUG,
+                         "test_send_file-filehandler")
         with open(os.path.abspath(os.path.join("dummy_files", "video.mp4")), 'rb') as file:
             video = file.read()
 
@@ -82,34 +93,32 @@ class TestSendRecv:
         assert client_reply["flags"] == 1
         assert client_reply["data"] == int.to_bytes(len(video), byteorder='big', length=4)
 
-    @pytest.mark.parametrize('active_client_list', [10], indirect=True)
-    def test_send_file_multi_client(self, active_client_list, server):
-        change_log_path(logger, os.path.join(log_folder, "test_send_file_multi_client.log"), logging.DEBUG)
+    @pytest.mark.parametrize('client_list', [20], indirect=True)
+    def test_send_file_multi_client(self, client_list, server):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_send_file_multi_client.log"),
+                         logging.DEBUG,
+                         "test_send_file_multi_client-filehandler")
         with open(os.path.abspath(os.path.join("dummy_files", "photo.jpg")), 'rb') as file:
             photo = file.read()
 
-        server.set_listener_timeout(3)
+        completed = queue.Queue()
+
         server.start()
         time.sleep(0.1)
         threads = []
-        for client in active_client_list:
-            client.start()
-            threads.append(threading.Thread(target=client.send, args=[photo]))
+        for i, c in enumerate(client_list):
+            c.connect()
+            threads.append(threading.Thread(target=self.send, args=[c, i, photo, completed]))
 
         for thread in threads:
             thread.start()
-            thread.join()
+
+        # Wait for all msgs to be sent
+        for i in range(20):
+            completed.get(block=True)
 
         assert server.has_messages()
 
-
-
-
-
-
-
-
-
-
-
-
+        for msg in server.get_all_msg():
+            assert msg.data == photo

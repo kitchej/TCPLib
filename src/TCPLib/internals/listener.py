@@ -49,11 +49,9 @@ class Listener:
     def close(self):
         self._soc.close()
         self._soc = None
-        logger.debug("Listener socket has been closed")
 
     def mainloop(self):
         while self._server_obj.is_running():
-            logger.debug("Listening for new connections")
             try:
                 self._soc.listen()
                 client_soc, client_addr = self._soc.accept()

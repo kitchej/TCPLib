@@ -8,7 +8,7 @@ import logging
 import os
 
 from tests.globals_for_tests import setup_log_folder
-from src.dev_tools.logger import change_log_path
+from dev_tools.log_util import add_file_handler
 
 """
 TO TEST:
@@ -18,6 +18,7 @@ TO TEST:
 """
 
 logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
 log_folder = setup_log_folder("TestClientMgmt")
 
 
@@ -28,15 +29,18 @@ class TestClientMgmt:
         """
         10 clients should connect and the 11th should be denied connection
         """
-        change_log_path(logger, os.path.join(log_folder, "test_server_limits.log"), logging.DEBUG)
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_server_limits.log"),
+                         logging.DEBUG,
+                         "test-server-limits-filehandler")
         server.set_max_clients(10)
         last_client = client_list.pop()
 
         server.start()
         time.sleep(0.1)
 
-        for client in client_list:
-            client.connect()
+        for c in client_list:
+            c.connect()
         time.sleep(0.1)
 
         assert server.client_count() == 10
