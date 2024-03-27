@@ -70,7 +70,7 @@ class DummyServer:
 @pytest.fixture
 def dummy_server():
     s = DummyServer(HOST, PORT)
-    threading.Thread(target=lambda: s.listen()).start()
+    threading.Thread(target=s.listen).start()
     time.sleep(0.1)
     yield s
     s.close()
