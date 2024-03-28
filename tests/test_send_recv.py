@@ -20,9 +20,9 @@ log_folder = setup_log_folder("TestSendRecv")
 
 class TestSendRecv:
     @staticmethod
-    def send(client, id, data, completed_q):
+    def send(client, thread_id, data, completed_q):
         client.send(data)
-        completed_q.put(f"{id} SENT")
+        completed_q.put(f"{thread_id} SENT")
 
     @staticmethod
     def echo(client, server, data):
@@ -67,7 +67,7 @@ class TestSendRecv:
                          os.path.join(log_folder, "test_send_file.log"),
                          logging.DEBUG,
                          "test_send_file-filehandler")
-        with open(os.path.abspath(os.path.join("dummy_files", "video.mp4")), 'rb') as file:
+        with open(os.path.abspath(os.path.join("dummy_files", "video1.mkv")), 'rb') as file:
             video = file.read()
 
         server.start()

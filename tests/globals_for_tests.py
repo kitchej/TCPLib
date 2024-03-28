@@ -6,6 +6,8 @@ PORT = 5000
 
 
 def setup_log_folder(folder_name):
+    if not os.path.exists("logs"):
+        os.mkdir("logs")
     log_folder = os.path.join("logs", folder_name)
     if not os.path.exists(log_folder):
         os.mkdir(log_folder)
