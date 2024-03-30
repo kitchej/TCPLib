@@ -2,9 +2,9 @@
 
 ---
 
-**NOTE: This library should not be considered a secure way to transmit data. Data is transmitted as-is, so any senstive data should be secured before being sent over public networks. Use at your own risk!**
+**NOTE: This library was made for educational purposes and should not be considered a secure way to transmit data. Data is transmitted as-is, so any sensitive data should be secured before being sent over public networks.**
 
-TCPLib is a library for setting up a simple TCP clinet and server. All data is sent as bytes, therefore data must be converted to a ```bytes()``` or ```bytearray()``` object before sending.
+TCPLib is a library for setting up a simple TCP clinet and server. All data is sent as bytes, therefore data must be converted to a ```bytes()``` or ```bytearray()``` object before sending. All data is received is returned as a ```bytearray()```.
 
 The server is equipped to handle multiple client connections and provides an interface for managing those connections. Messages sent to the server are placed in a queue which can be accessed with the class interface.
 

@@ -21,10 +21,7 @@ class TestLibState:
         assert not server.is_running()
         assert not server.is_full()
         assert server.max_clients() == 0
-
-        assert server.listener_timeout() is None
-        server.set_listener_timeout(10)
-        assert server.listener_timeout() == 10
+        assert server.timeout() is None
 
         server.start()
         time.sleep(0.1)
@@ -33,8 +30,18 @@ class TestLibState:
         assert server.is_running()
         assert not server.is_full()
         assert server.max_clients() == 0
+        assert server.timeout() is None
 
-        server.set_max_clients(1)
+        assert server.set_timeout(10)
+        assert server.timeout() == 10
+        assert not server.set_timeout(-1)
+        assert not server.set_timeout(-25)
+        assert server.timeout() == 10
+
+        assert server.set_max_clients(1)
+        assert server.max_clients() == 1
+        assert not server.set_max_clients(-1)
+        assert not server.set_max_clients(-25)
         assert server.max_clients() == 1
 
         dummy_client.connect((HOST, PORT))
@@ -50,6 +57,7 @@ class TestLibState:
 
         try:
             assert client_info["is_running"] is True
+            assert client_info["timeout"] == 10
             assert client_info["host"] == HOST
             assert client_info["port"] == client_proc._tcp_client._addr[1]
         except KeyError:

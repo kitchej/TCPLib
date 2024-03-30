@@ -13,3 +13,11 @@ class Message:
 
     def __len__(self):
         return self.size
+
+    def __eq__(self, other):
+        if isinstance(other, Message):
+            return self.data == other.data
+        elif isinstance(other, bytearray):
+            return self.data == other
+        else:
+            raise TypeError
