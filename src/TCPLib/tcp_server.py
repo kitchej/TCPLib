@@ -55,7 +55,7 @@ class TCPServer:
         pass
 
     def start_client_proc(self, client_id: str, host: str, port: int, client_soc: socket.socket):
-        result = self._on_connect()
+        result = self._on_connect(client_soc, client_id, host, port)
         if result is False:
             client_soc.close()
             return
