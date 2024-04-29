@@ -59,7 +59,7 @@ class Listener:
                 if self._server_obj.is_full():
                     logger.debug("%s @ %d was denied connection due to server being full",
                                  client_addr[0], client_addr[1])
-                    client_soc.sendall(encode_msg(b'0', 4))
+                    client_soc.sendall(encode_msg(b'SERVER FULL', 4))   # Warn client they are being disconnected
                     client_soc.close()
                     continue
                 client_soc.sendall(encode_msg(b'0', 2))

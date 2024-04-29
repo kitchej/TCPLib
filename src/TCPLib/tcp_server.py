@@ -61,7 +61,7 @@ class TCPServer:
             return
         client_proc = ClientProcessor(client_id=client_id,
                                       host=host,
-                                      port=port,
+                                     port=port,
                                       client_soc=client_soc,
                                       msg_queue=self._messages,
                                       server_obj=self,
