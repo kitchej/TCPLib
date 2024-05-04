@@ -14,13 +14,15 @@ logger = logging.getLogger(__name__)
 
 class ClientProcessor(ActiveTcpClient):
     '''Maintains a single client connection for the server'''
-    def __init__(self, client_id, host, port, msg_queue: queue.Queue, client_soc, server_obj, buff_size=4096):
+    def __init__(self, client_id, host, port, msg_queue: queue.Queue, client_soc, server_obj,
+                 buff_size=4096, timeout: int = None):
         ActiveTcpClient.__init__(self,
                                  host=host,
                                  port=port,
                                  msg_queue=msg_queue,
                                  client_id=client_id,
-                                 buff_size=buff_size)
+                                 buff_size=buff_size,
+                                 timeout=timeout)
         self._client_soc = client_soc
         self._server_obj = server_obj
 

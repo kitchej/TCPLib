@@ -19,9 +19,9 @@ DISCONNECT = 4
 
 class PassiveTcpClient:
     '''Only receives and sends data when told'''
-    def __init__(self, host, port):
+    def __init__(self, host: str, port: int, timeout: int = None):
         self._addr = (host, port)
-        self._timeout = None
+        self._timeout = timeout
         self._is_connected = False
         self._soc = None
 
@@ -75,7 +75,7 @@ class PassiveTcpClient:
         logger.info("Connected to %s @ %d", self._addr[0], self._addr[1])
         return True
 
-    def disconnect(self, warn=True):
+    def disconnect(self, warn: bool = True):
         """
         If warn is set to true, a disconnect message will be sent to the server.
         NOTE: When disconnecting after an error, warn should ALWAYS be False
@@ -141,11 +141,13 @@ class PassiveTcpClient:
             self._clean_up()
             return
 
-    def receive(self, buff_size):
+    def receive(self, buff_size: int):
         """
         Returns a generator for iterating over the bytes of an incoming message. The first item returned is the contents
         of the header, then all other calls return the bytes of a message.
         """
+        if buff_size <= 0:
+            return
         bytes_recv = 0
         header = self.receive_bytes(5)
         if not header:
@@ -164,19 +166,21 @@ class PassiveTcpClient:
                 buff_size = remaining
             yield data
 
-    def receive_all(self, buff_size):
+    def receive_all(self, buff_size: int):
         """
         Receive all the bytes of an incoming message in one, easy method.
         """
         data = bytearray()
         gen = self.receive(buff_size)
+        if not gen:
+            return
         try:
             size, flags = next(gen)
         except StopIteration:
             return
         for chunk in gen:
             if not chunk:
-                return ()
+                return
             data.extend(chunk)
         logger.debug("Received a total of %d bytes from %s @ %d", len(data), self._addr[0], self._addr[1])
         return size, flags, data
