@@ -30,17 +30,18 @@ def decode_header(header: bytes):
     return size, flags
 
 
-HOST = "127.0.0.1"
+# HOST = "127.0.0.1"
+HOST = "192.168.1.37"
 PORT = 5000
 
 # HOST = "192.168.1.32"
 # PORT = 5000
 
-with open(os.path.join("dummy_files", "video1.mkv"), 'rb') as file:
-    video = file.read()
-
-with open(os.path.join("dummy_files", "DOI.txt"), 'rb') as file:
-    text = file.read()
+# with open(os.path.join("dummy_files", "video1.mkv"), 'rb') as file:
+#     video = file.read()
+#
+# with open(os.path.join("dummy_files", "DOI.txt"), 'rb') as file:
+#     text = file.read()
 
 
 class DummyServer:

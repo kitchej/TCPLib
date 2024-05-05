@@ -32,7 +32,7 @@ c_passive = PassiveTcpClient(
 
 def client_list(num_clients):
     clients = [PassiveTcpClient(host=HOST, port=PORT) for _ in range(num_clients)]
-    return  clients
+    return clients
 
 
 def active(client):

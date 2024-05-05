@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "TCP-Lib"
-version = "0.0.1"
+version = "1.0.0"
 authors = [
   { name="Joshua Kitchen"},
 ]
@@ -18,8 +18,8 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/pypa/sampleproject"
-Issues = "https://github.com/pypa/sampleproject/issues"
+Homepage = "https://github.com/kitchej/TCPLib"
+Issues = "https://github.com/kitchej/TCPLib/issues"
 
 [tool.pytest.ini_options]
 minversion = "6.0"

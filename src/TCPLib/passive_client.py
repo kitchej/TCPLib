@@ -156,6 +156,8 @@ class PassiveTcpClient:
         logger.info("Incoming message from %s @ %d:\n\tSIZE: %d\n\tFLAGS: %d",
                     self._addr[0], self._addr[1], size, flags)
         yield size, flags
+        if size < buff_size:
+            buff_size = size
         while bytes_recv < size:
             data = self.receive_bytes(buff_size)
             if not data:
