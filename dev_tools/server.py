@@ -11,7 +11,7 @@ import dev_tools.log_util as log_util
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 log_util.add_file_handler(logger, "logs\\Server_Log", logging.DEBUG, "server-file-handler")
-# log_util.add_stream_handler(logger, logging.DEBUG, "server-stream-handler")
+log_util.add_stream_handler(logger, logging.DEBUG, "server-stream-handler")
 
 
 def encode_msg(data: bytes, flags: int):
@@ -137,10 +137,57 @@ def use_interface():
     th.join()
 
 
+def save_files(save_dir):
+    s = tcp_server.TCPServer(HOST, PORT)
+    s.start()
+    client_id = None
+
+    while True:
+        filename = s.pop_msg(block=True)
+        if filename.data == b"DONE":
+            client_id = filename.client_id
+            break
+        message = s.pop_msg(block=True)
+        if message.data == b"DONE":
+            break
+
+        filename = str(filename.data, "utf-8")
+        with open(os.path.join(save_dir, filename), 'wb') as file:
+            file.write(message.data)
+
+    s.send(client_id, b"DONE")
+
+
+def send_file(filepath):
+    s = tcp_server.TCPServer(HOST, PORT)
+    s.start()
+    filename = os.path.split(filepath)[-1]
+    with open(filepath, 'rb') as file:
+        data = file.read()
+
+    while s.client_count() != 1:
+        continue
+
+    client_id = s.list_clients()[0]
+
+    s.send(client_id, bytes(filename, 'utf-8'))
+    s.send(client_id, data)
+
+
+
+
+
+print(os.getcwd())
+
 # use_dummy(text)
 # use_dummy(video)
 
 # use_real(text)
 # use_real(video)
 
-use_interface()
+# use_interface()
+
+# save_files(r"C:\Users\Josh\PycharmProjects\TCPLib\dev_tools\photo")
+
+send_file(r"C:\Users\Josh\PycharmProjects\TCPLib\dist\TCP_Lib-1.0.0-py3-none-any.whl")
+

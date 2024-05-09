@@ -26,6 +26,7 @@ class ServerInterface:
             "start": self.start,
             "clients": self.view_clients,
             "send": self.send_message,
+            "sendFile": self.send_file,
             "messages": self.view_messages,
             "checkMsg": self.query_messages,
             "kick": self.kick
@@ -80,6 +81,7 @@ class ServerInterface:
             "restart - restarts the server\n"
             "clients - View all clients currently connected\n"
             "send [client_id] [message] - Send message to a Client\n"
+            "sendFile [client_id] [filepath] - Send a file to the client"
             "messages - View all messages\n"
             "checkMsg - Query server for new messages"
             "kick [client_id] - Disconnect a Client\n"
@@ -169,6 +171,31 @@ class ServerInterface:
             print(f"Sent message to {args[0]}")
         else:
             print(f"No Client with id {args[0]}")
+
+    def send_file(self, args):
+        print(args)
+        if len(args) != 2:
+            print(f"sendFile expects 2 arguments, but {len(sys.argv)} arguments were given")
+        client_id = args[0]
+        filename = args[1]
+        if not os.path.exists(filename):
+            print(f"{args[1]} is not a valid path")
+        if os.path.isdir(filename):
+            print(f"{args[1]} is a directory")
+
+        with open(filename, 'rb') as file:
+            data = file.read()
+
+        result = self.server_obj.send(client_id, bytes(filename, "utf-8"))
+        if result:
+            print(f"Sent filename to {args[0]}")
+        else:
+            print(f"No Client with id {args[0]}")
+        result = self.server_obj.send(client_id, data)
+        if result:
+            print(f"Sent message to {args[0]}")
+        else:
+            print(f"Problem sending to client {client_id}")
 
     def query_messages(self, args):
         i = 0

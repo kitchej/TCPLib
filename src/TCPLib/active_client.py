@@ -49,8 +49,6 @@ class ActiveTcpClient:
             self._msg_queue.put(Message(self._client_id, size, flags, data))
             if flags == 4:
                 self._clean_up()
-            if flags == 2:
-                self._tcp_client.send(int.to_bytes(len(data), byteorder='big', length=4), 1)
 
     def pop_msg(self, block: bool = False):
         try:
