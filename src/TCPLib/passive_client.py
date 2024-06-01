@@ -179,10 +179,10 @@ class PassiveTcpClient:
         try:
             size, flags = next(gen)
         except StopIteration:
-            return
+            return None, None, None
         for chunk in gen:
             if not chunk:
-                return
+                return size, flags, None
             data.extend(chunk)
         logger.debug("Received a total of %d bytes from %s @ %d", len(data), self._addr[0], self._addr[1])
         return size, flags, data

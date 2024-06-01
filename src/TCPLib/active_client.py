@@ -63,6 +63,10 @@ class ActiveTcpClient:
     def has_messages(self):
         return not self._msg_queue.empty()
 
+    def clear_messages(self):
+        with self._msg_queue.mutex:
+            self._msg_queue.queue.clear()
+
     def id(self):
         return self._client_id
 
