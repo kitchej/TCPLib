@@ -42,10 +42,9 @@ class ActiveTcpClient:
         logger.debug("Client %s is listening for new messages from %s @ %d",
                      self._client_id, self.addr()[0], self.addr()[1])
         while self._is_running:
-            msg = self._tcp_client.receive_all(self._buff_size)
-            if not msg:
+            size, flags, data = self._tcp_client.receive_all(self._buff_size)
+            if not data:
                 continue
-            size, flags, data = msg[0], msg[1], msg[2]
             self._msg_queue.put(Message(self._client_id, size, flags, data))
             if flags == 4:
                 self._clean_up()
