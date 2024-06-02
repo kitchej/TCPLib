@@ -189,5 +189,7 @@ print(os.getcwd())
 
 # save_files(r"C:\Users\Josh\PycharmProjects\TCPLib\dev_tools\photo")
 
-send_file(r"C:\Users\Josh\PycharmProjects\TCPLib\dist\TCP_Lib-1.0.0-py3-none-any.whl")
+# send_file(r"C:\Users\Josh\PycharmProjects\TCPLib\dist\TCP_Lib-1.0.0-py3-none-any.whl")
+
+
 

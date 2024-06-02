@@ -145,15 +145,15 @@ class TCPServer:
             client.stop(warn=warn)
         return True
 
-    def pop_msg(self, block: bool = False):
+    def pop_msg(self, block: bool = False, timeout: int = None):
         try:
-            return self._messages.get(block=block)
+            return self._messages.get(block=block, timeout=timeout)
         except queue.Empty:
             return None
 
-    def get_all_msg(self, block: bool = False):
+    def get_all_msg(self, block: bool = False, timeout: int = None):
         while not self._messages.empty():
-            yield self.pop_msg(block=block)
+            yield self.pop_msg(block=block, timeout=timeout)
 
     def has_messages(self):
         return not self._messages.empty()
