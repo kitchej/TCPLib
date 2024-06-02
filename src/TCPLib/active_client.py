@@ -45,9 +45,11 @@ class ActiveTcpClient:
             size, flags, data = self._tcp_client.receive_all(self._buff_size)
             if data is None:
                 continue
-            self._msg_queue.put(Message(self._client_id, size, flags, data))
             if flags == 4:
                 self._clean_up()
+                return
+            self._msg_queue.put(Message(self._client_id, size, flags, data))
+
 
     def pop_msg(self, block: bool = False, timeout: int = None):
         try:
