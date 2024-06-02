@@ -43,7 +43,7 @@ class ActiveTcpClient:
                      self._client_id, self.addr()[0], self.addr()[1])
         while self._is_running:
             size, flags, data = self._tcp_client.receive_all(self._buff_size)
-            if not data:
+            if data is None:
                 continue
             self._msg_queue.put(Message(self._client_id, size, flags, data))
             if flags == 4:
