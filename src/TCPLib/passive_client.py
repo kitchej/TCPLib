@@ -56,8 +56,7 @@ class PassiveTcpClient:
 
         try:
             self._soc.connect(self._addr)
-            confirm_conn = self._soc.recv(6)
-            _, flags = decode_header(confirm_conn[:5])
+            size, flags, data = self.receive_all(1)
             if flags == 4:
                 self._soc.close()
                 return False

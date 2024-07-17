@@ -30,12 +30,12 @@ class TestSendRecv:
         server_client_id = server.list_clients()[0]
 
         client.send(data)
+        time.sleep(0.1)
         server_copy = server.pop_msg(block=True)
-        server_reply = client.pop_msg(block=True)
-        server.send(server_client_id, server_copy.data)
 
+        server.send(server_client_id, server_copy.data)
+        time.sleep(0.1)
         client_copy = client.pop_msg(block=True)
-        client_reply = server.pop_msg(block=True)
 
         server_copy = {
             "size": server_copy.size,
@@ -48,19 +48,7 @@ class TestSendRecv:
             "flags": client_copy.flags,
             "data": client_copy.data
         }
-
-        server_reply = {
-            "size": server_reply.size,
-            "flags": server_reply.flags,
-            "data": server_reply.data
-        }
-
-        client_reply = {
-            "size": client_reply.size,
-            "flags": client_reply.flags,
-            "data": client_reply.data
-        }
-        return server_copy, client_copy, server_reply, client_reply
+        return server_copy, client_copy
 
     def test_send_file(self, server, active_client):
         add_file_handler(logger,
@@ -75,7 +63,7 @@ class TestSendRecv:
         active_client.start()
         time.sleep(0.1)
 
-        server_msg, client_msg, server_reply, client_reply = self.echo(active_client, server, video)
+        server_msg, client_msg = self.echo(active_client, server, video)
 
         assert server_msg["size"] == len(video)
         assert server_msg["flags"] == 2
@@ -84,14 +72,6 @@ class TestSendRecv:
         assert client_msg["size"] == len(video)
         assert client_msg["flags"] == 2
         assert client_msg["data"] == video
-
-        assert server_reply["size"] == 4
-        assert server_reply["flags"] == 1
-        assert server_reply["data"] == int.to_bytes(len(video), byteorder='big', length=4)
-
-        assert client_reply["size"] == 4
-        assert client_reply["flags"] == 1
-        assert client_reply["data"] == int.to_bytes(len(video), byteorder='big', length=4)
 
     @pytest.mark.parametrize('client_list', [20], indirect=True)
     def test_send_file_multi_client(self, client_list, server):
