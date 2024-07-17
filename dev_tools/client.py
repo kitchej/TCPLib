@@ -79,4 +79,18 @@ def multi_client():
 
 # passive(c_passive)
 # active(c_active)
-multi_client()
+# multi_client()
+
+c_passive.connect()
+c_passive.send(b"REQ FILE")
+
+start = time.perf_counter()
+size, flags, data = c_passive.receive_all(1024)
+end = time.perf_counter()
+
+with open("C:\\Users\\Josh\\Pictures\\Saved Pictures\\python.mkv", 'wb') as file:
+    file.write(data)
+
+print(f"SIZE: {size}\nFLAGS: {flags}\nReceived in {(end - start) * 1000} milliseconds")
+
+c_passive.disconnect(warn=False)

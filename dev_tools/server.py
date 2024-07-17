@@ -177,7 +177,7 @@ def send_file(filepath):
 
 
 
-print(os.getcwd())
+
 
 # use_dummy(text)
 # use_dummy(video)
