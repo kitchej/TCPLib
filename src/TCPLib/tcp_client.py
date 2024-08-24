@@ -1,29 +1,31 @@
 """
-passive_client.py
+tcp_client.py
 Written by: Joshua Kitchen - 2024
 """
 import logging
 import socket
 
+from .msg_flags import Flags
 from .internals.utils import encode_msg, decode_header
-
 
 logger = logging.getLogger(__name__)
 
 
-# Message flags
-COUNT = 1
-DATA = 2
-DISCONNECT = 4
-
-
-class PassiveTcpClient:
-    '''Only receives and sends data when told'''
+class TCPClient:
+    '''A basic TCP client'''
     def __init__(self, host: str, port: int, timeout: int = None):
+        self._soc = None
         self._addr = (host, port)
         self._timeout = timeout
         self._is_connected = False
-        self._soc = None
+
+    @classmethod
+    def from_socket(cls, soc: socket.socket = None):
+        out = cls(None, None, soc.gettimeout())
+        out._soc = soc
+        out._addr = soc.getsockname()
+        out._is_connected = True
+        return out
 
     def _clean_up(self):
         self.disconnect(warn=False)
@@ -43,16 +45,13 @@ class PassiveTcpClient:
     def addr(self):
         return self._addr
 
-    def connect(self, soc: socket.socket = None):
-        if soc:
-            self._soc = soc
-            self._soc.settimeout(self._timeout)
-            return
-        else:
-            self._soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self._soc.settimeout(self._timeout)
+    def connect(self):
+        if self._is_connected:
+            return True
+        self._soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._soc.settimeout(self._timeout)
 
-        logger.info("Connecting to %s @ %d", self._addr[0], self._addr[1])
+        logger.info("Attempting to connect to %s @ %d", self._addr[0], self._addr[1])
 
         try:
             self._soc.connect(self._addr)
@@ -72,17 +71,17 @@ class PassiveTcpClient:
             self._clean_up()
             return e
         self._is_connected = True
-        logger.info("Connected to %s @ %d", self._addr[0], self._addr[1])
+        logger.info("Successfully connected to %s @ %d", self._addr[0], self._addr[1])
         return True
 
-    def disconnect(self, warn: bool = True):
+    def disconnect(self, warn: bool = False):
         """
         If warn is set to true, a disconnect message will be sent to the server.
         NOTE: When disconnecting after an error, warn should ALWAYS be False
         """
         if self._is_connected:
             if warn:
-                self.send_bytes(encode_msg(b'', DISCONNECT))
+                self.send_bytes(encode_msg(b'', Flags.DISCONNECT))
             if self._soc is not None:
                 self._soc.close()
                 self._soc = None
@@ -93,7 +92,7 @@ class PassiveTcpClient:
 
     def send_bytes(self, data: bytes):
         """
-        Send all bytes unprocessed.
+        Send all bytes of 'data' WITHOUT a header attached
         """
         try:
             self._soc.sendall(data)
@@ -113,9 +112,9 @@ class PassiveTcpClient:
             self._clean_up()
             return False
 
-    def send(self, data: bytes, flags: int = DATA):
+    def send(self, data: bytes, flags: int = Flags.DATA):
         """
-        Send all bytes with a header attached
+        Send all bytes of 'data' WITH a header attached
         """
         msg = encode_msg(data, flags)
         result = self.send_bytes(msg)
@@ -123,7 +122,7 @@ class PassiveTcpClient:
 
     def receive_bytes(self, size: int):
         """
-        Receive only the number of bytes specified.
+        Receive only the number of bytes specified. Does not process the header if attached
         """
         try:
             data = self._soc.recv(size)
@@ -141,10 +140,10 @@ class PassiveTcpClient:
             self._clean_up()
             return
 
-    def receive(self, buff_size: int):
+    def receive(self, buff_size: int = 4096):
         """
-        Returns a generator for iterating over the bytes of an incoming message. The first item returned is the contents
-        of the header, then all other calls return the bytes of a message.
+        Returns a generator for iterating over the bytes of an incoming message. Header information is returned first as
+        a tuple containing the size and flags. Subsequent calls return the contents of the message as it is received.
         """
         if buff_size <= 0:
             return
@@ -168,7 +167,7 @@ class PassiveTcpClient:
                 buff_size = remaining
             yield data
 
-    def receive_all(self, buff_size: int):
+    def receive_all(self, buff_size: int = 4096):
         """
         Receive all the bytes of an incoming message in one, easy method.
         """

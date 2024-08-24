@@ -10,13 +10,13 @@ import socket
 import os
 import shutil
 
-from TCPLib.passive_client import PassiveTcpClient
+from TCPLib.tcp_client import TCPClient
 from TCPLib.tcp_server import TCPServer
-from TCPLib.active_client import ActiveTcpClient
+from TCPLib.auto_tcp_client import AutoTCPClient
 
-# from src.TCPLib.passive_client import PassiveTcpClient
+# from src.TCPLib.tcp_client import TCPClient
 # from src.TCPLib.tcp_server import TCPServer
-# from src.TCPLib.active_client import ActiveTcpClient
+# from src.TCPLib.auto_tcp_client import AutoTCPClient
 
 from tests.globals_for_tests import HOST, PORT
 
@@ -96,7 +96,7 @@ def server():
 
 @pytest.fixture
 def client():
-    c = PassiveTcpClient(
+    c = TCPClient(
         host=HOST,
         port=PORT
     )
@@ -106,7 +106,7 @@ def client():
 
 @pytest.fixture
 def active_client():
-    c = ActiveTcpClient(
+    c = AutoTCPClient(
         host=HOST,
         port=PORT,
         client_id="Active_Client_Standalone"
@@ -118,7 +118,7 @@ def active_client():
 @pytest.fixture
 def client_list(request):
     num_clients = request.param
-    clients = [PassiveTcpClient(host=HOST, port=PORT) for _ in range(num_clients)]
+    clients = [TCPClient(host=HOST, port=PORT) for _ in range(num_clients)]
     yield clients
     for client in clients:
         client.disconnect()
@@ -127,7 +127,7 @@ def client_list(request):
 @pytest.fixture
 def active_client_list(request):
     num_clients = request.param
-    clients = [ActiveTcpClient(host=HOST, port=PORT, client_id=f"Client-{i}") for i in range(num_clients)]
+    clients = [AutoTCPClient(host=HOST, port=PORT, client_id=f"Client-{i}") for i in range(num_clients)]
     yield clients
     for client in clients:
         client.stop()

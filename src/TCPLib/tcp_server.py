@@ -1,36 +1,40 @@
 """
 tcp_server.py
 Written by: Joshua Kitchen - 2024
+
+TODO:
+    - Better system for controlling the timeout of the server and all its client connections
 """
 import logging
 import socket
 import threading
 import queue
+import random
 
-from .internals.listener import Listener
 from .internals.client_processor import ClientProcessor
+from .internals.utils import encode_msg
 
 logger = logging.getLogger(__name__)
-
-# Message flags
-COUNT = 1
-DATA = 2
-DISCONNECT = 4
 
 
 class TCPServer:
     '''Class for creating, maintaining, and transmitting data to multiple client connections.'''
+
     def __init__(self, host: str, port: int, max_clients: int = 0, timeout: int = None):
         self._max_clients = max_clients
         self._connected_clients = {}
         self._connected_clients_lock = threading.Lock()
         self._messages = queue.Queue()
         self._is_running = False
-        self._listener = Listener(host=host,
-                                  port=port,
-                                  server_obj=self,
-                                  timeout=timeout)
         self._timeout = timeout
+        self._addr = (host, port)
+        self._soc = None
+
+    @staticmethod
+    def _generate_client_id():
+        client_id = str(random.randint(0, 999999))
+        client_id = int(client_id, base=36)
+        return str(client_id)
 
     def _get_client(self, client_id: str):
         self._connected_clients_lock.acquire()
@@ -46,6 +50,37 @@ class TCPServer:
         self._connected_clients_lock.acquire()
         self._connected_clients.update({client_id: client})
         self._connected_clients_lock.release()
+
+    def _create_soc(self):
+        self._soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._soc.settimeout(self._timeout)
+        try:
+            self._soc.bind(self._addr)
+        except socket.gaierror:
+            logger.exception(f"Exception when trying to bind to %s @ %d", self._addr[0], self._addr[1])
+            return False
+        return True
+
+    def _mainloop(self):
+        while self.is_running():
+            try:
+                self._soc.listen()
+                client_soc, client_addr = self._soc.accept()
+                logger.info("Accepted Connection from %s @ %d", client_addr[0], client_addr[1])
+                if self.is_full():
+                    logger.debug("%s @ %d was denied connection due to server being full",
+                                 client_addr[0], client_addr[1])
+                    client_soc.sendall(encode_msg(b'SERVER FULL', 4))  # Warn client they are being disconnected
+                    client_soc.close()
+                    continue
+                client_soc.sendall(encode_msg(b'0', 2))
+                self.start_client_proc(self._generate_client_id(),
+                                       client_addr[0],
+                                       client_addr[1],
+                                       client_soc)
+            except OSError:
+                logger.exception(f"Exception occurred while listening on %s @ %d", self._addr[0], self._addr[1])
+                break
 
     def _on_connect(self, *args, **kwargs):
         '''
@@ -71,7 +106,7 @@ class TCPServer:
         self._update_connected_clients(client_proc.id(), client_proc)
 
     def addr(self):
-        return self._listener.addr()
+        return self._addr
 
     def is_running(self):
         return self._is_running
@@ -103,7 +138,6 @@ class TCPServer:
         elif timeout < 0:
             return False
         self._timeout = timeout
-        self._listener.set_timeout(timeout)
 
         for client_id in self.list_clients():
             client_proc = self._get_client(client_id)
@@ -171,20 +205,21 @@ class TCPServer:
     def start(self):
         if self._is_running:
             return False
-        if not self._listener.create_soc():
+        if not self._create_soc():
             return False
         self._is_running = True
-        threading.Thread(target=self._listener.mainloop).start()
+        threading.Thread(target=self._mainloop).start()
         logger.info("Server has been started")
         return True
 
     def stop(self):
         if self._is_running:
-            self._is_running = False
-            self._listener.close()
             self._connected_clients_lock.acquire()
             for client in self._connected_clients.values():
                 client.stop()
             self._connected_clients.clear()
             self._connected_clients_lock.release()
+            self._soc.close()
+            self._soc = None
+            self._is_running = False
             logger.info("Server has been stopped")
