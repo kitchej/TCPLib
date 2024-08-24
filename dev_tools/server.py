@@ -3,6 +3,7 @@ import logging
 import threading
 import socket
 import traceback
+import time
 
 import src.TCPLib.tcp_server as tcp_server
 from server_interface import ServerInterface
@@ -30,8 +31,8 @@ def decode_header(header: bytes):
     return size, flags
 
 
-# HOST = "127.0.0.1"
-HOST = "192.168.1.37"
+HOST = "127.0.0.1"
+# HOST = "192.168.1.37"
 PORT = 5000
 
 # HOST = "192.168.1.32"
@@ -174,11 +175,17 @@ def send_file(filepath):
     s.send(client_id, data)
 
 
+def cpp_server():
+    s = tcp_server.TCPServer(HOST, PORT)
+    s.start()
+    while True:
+        print("Waiting for messages")
+        message = s.pop_msg(block=True)
+        print(f"Recevied message: {message.data}")
+        s.send(message.client_id, b"Hello from Python!")
 
 
-
-
-
+cpp_server()
 # use_dummy(text)
 # use_dummy(video)
 
@@ -188,7 +195,7 @@ def send_file(filepath):
 # use_interface()
 
 # save_files(r"C:\Users\Josh\PycharmProjects\TCPLib\dev_tools\photo")
-
+send_file(r"C:\Users\Josh\Pictures\images\business_cover.jpeg")
 # send_file(r"C:\Users\Josh\PycharmProjects\TCPLib\dist\TCP_Lib-1.0.0-py3-none-any.whl")
 
 

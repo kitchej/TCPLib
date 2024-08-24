@@ -132,7 +132,7 @@ class TCPServer:
             "port": client.addr()[1]
         }
 
-    def disconnect_client(self, client_id: str, warn: bool = True):
+    def disconnect_client(self, client_id: str, warn: bool = False):
         self._connected_clients_lock.acquire()
         try:
             client = self._connected_clients[client_id]

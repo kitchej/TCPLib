@@ -96,7 +96,6 @@ class PassiveTcpClient:
         """
         try:
             self._soc.sendall(data)
-            logger.debug("Sent %d bytes to %s @ %d", len(data), self._addr[0], self._addr[1])
             return True
         except ConnectionAbortedError:
             self._clean_up()
@@ -118,8 +117,8 @@ class PassiveTcpClient:
         """
         msg = encode_msg(data, flags)
         result = self.send_bytes(msg)
+        logger.debug("Sent %d bytes to %s @ %d", len(data), self._addr[0], self._addr[1])
         return result
-
     def receive_bytes(self, size: int):
         """
         Receive only the number of bytes specified.

@@ -50,7 +50,6 @@ class ActiveTcpClient:
                 return
             self._msg_queue.put(Message(self._client_id, size, flags, data))
 
-
     def pop_msg(self, block: bool = False, timeout: int = None):
         try:
             return self._msg_queue.get(block=block, timeout=timeout)
