@@ -69,10 +69,6 @@ class TestLibState:
         assert server.is_full() is False
         assert server.client_count() == 0
 
-        server._messages.put("Hello World")
-        server._messages.put("Hello World1")
-        server._messages.put("Hello World2")
-
         server.stop()
 
         assert server.addr() == (HOST, PORT)

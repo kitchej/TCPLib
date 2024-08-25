@@ -10,13 +10,13 @@ import socket
 import os
 import shutil
 
-from TCPLib.tcp_client import TCPClient
-from TCPLib.tcp_server import TCPServer
-from TCPLib.auto_tcp_client import AutoTCPClient
+# from TCPLib.tcp_client import TCPClient
+# from TCPLib.tcp_server import TCPServer
+# from TCPLib.auto_tcp_client import AutoTCPClient
 
-# from src.TCPLib.tcp_client import TCPClient
-# from src.TCPLib.tcp_server import TCPServer
-# from src.TCPLib.auto_tcp_client import AutoTCPClient
+from src.TCPLib.tcp_client import TCPClient
+from src.TCPLib.tcp_server import TCPServer
+from src.TCPLib.auto_tcp_client import AutoTCPClient
 
 from tests.globals_for_tests import HOST, PORT
 
@@ -28,7 +28,7 @@ def pytest_collection_modifyitems(items):
 
     Modifies test items in place to ensure test classes run in a given order.
     """
-    CLASS_ORDER = ["TestLibState"]
+    CLASS_ORDER = ["TestLibState", "TestUtils"]
     class_mapping = {item: item.cls.__name__ for item in items}
     sorted_items = items.copy()
     # Iteratively move tests of each class to the start of the test queue
