@@ -41,6 +41,7 @@ class AutoTCPClient:
                 continue
             if flags == 4:
                 self._clean_up()
+                self._msg_queue.put(Message(self._client_id, size, flags, data))
                 return
             self._msg_queue.put(Message(self._client_id, size, flags, data))
 
