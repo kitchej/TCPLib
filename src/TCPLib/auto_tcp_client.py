@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 class AutoTCPClient:
     '''A basic TCP client that automatically listens for messages from a server'''
-    def __init__(self, host: str, port: int, client_id: str, msg_queue: queue.Queue = None,
+    def __init__(self, host: str = None, port: int = None, client_id: str = None, msg_queue: queue.Queue = None,
                  buff_size: int = 4096, timeout: int = None):
         self._tcp_client = TCPClient(host=host, port=port, timeout=timeout)
         self._is_running = False
@@ -44,6 +44,8 @@ class AutoTCPClient:
                 self._msg_queue.put(Message(self._client_id, size, flags, data))
                 return
             self._msg_queue.put(Message(self._client_id, size, flags, data))
+
+
 
     def pop_msg(self, block: bool = False, timeout: int = None):
         try:
@@ -76,6 +78,9 @@ class AutoTCPClient:
 
     def addr(self):
         return self._tcp_client.addr()
+
+    def set_addr(self, host: str, port: int):
+        return self._tcp_client.set_addr(host, port)
 
     def is_running(self):
         return self._is_running

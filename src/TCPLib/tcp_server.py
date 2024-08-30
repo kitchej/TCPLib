@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class TCPServer:
     '''Class for creating, maintaining, and transmitting data to multiple client connections.'''
 
-    def __init__(self, host: str, port: int, max_clients: int = 0, timeout: int = None):
+    def __init__(self, host: str = None, port: int = None, max_clients: int = 0, timeout: int = None):
         self._max_clients = max_clients
         self._connected_clients = {}
         self._connected_clients_lock = threading.Lock()
@@ -107,6 +107,12 @@ class TCPServer:
 
     def addr(self):
         return self._addr
+
+    def set_addr(self, host: str, port: int):
+        if self._is_running:
+            return False
+        self._addr = (host, port)
+        return True
 
     def is_running(self):
         return self._is_running

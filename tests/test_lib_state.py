@@ -23,10 +23,16 @@ class TestLibState:
         assert server.max_clients() == 0
         assert server.timeout() is None
 
+        server.set_addr("123.456.789", 9000)
+        assert server.addr() == ("123.456.789", 9000)
+        server.set_addr(HOST, PORT)
+        assert server.addr() == (HOST, PORT)
+
         server.start()
         time.sleep(0.1)
 
         assert server.addr() == (HOST, PORT)
+        assert server.set_addr(HOST, PORT) is False
         assert server.is_running()
         assert not server.is_full()
         assert server.max_clients() == 0
@@ -87,10 +93,16 @@ class TestLibState:
         client.set_timeout(10)
         assert client.timeout() == 10
 
+        client.set_addr("123.456.789", 9000)
+        assert client.addr() == ("123.456.789", 9000)
+        client.set_addr(HOST, PORT)
+        assert client.addr() == (HOST, PORT)
+
         client.connect()
         time.sleep(0.1)
 
         assert client.addr() == (HOST, PORT)
+        assert client.set_addr(HOST, PORT) is False
         assert client.is_connected() is True
 
         client.disconnect()
@@ -112,10 +124,16 @@ class TestLibState:
         active_client.set_timeout(10)
         assert active_client.timeout() == 10
 
+        active_client.set_addr("123.456.789", 9000)
+        assert active_client.addr() == ("123.456.789", 9000)
+        active_client.set_addr(HOST, PORT)
+        assert active_client.addr() == (HOST, PORT)
+
         active_client.start()
         time.sleep(0.1)
 
         assert active_client.is_running() is True
+        assert active_client.set_addr(HOST, PORT) is False
 
         active_client._msg_queue.put("Hello World")
         active_client._msg_queue.put("Hello World1")

@@ -11,9 +11,13 @@ from .internals.utils import encode_msg, decode_header
 logger = logging.getLogger(__name__)
 
 
+class NoAddressSupplied(Exception):
+    pass
+
+
 class TCPClient:
     '''A basic TCP client'''
-    def __init__(self, host: str, port: int, timeout: int = None):
+    def __init__(self, host: str = None, port: int = None, timeout: int = None):
         self._soc = None
         self._addr = (host, port)
         self._timeout = timeout
@@ -41,11 +45,22 @@ class TCPClient:
         self._timeout = timeout
         if self._soc:
             self._soc.settimeout(self._timeout)
+            return True
+        else:
+            return False
+
+    def set_addr(self, host: str, port: int):
+        if self._is_connected:
+            return False
+        self._addr = (host, port)
+        return True
 
     def addr(self):
         return self._addr
 
     def connect(self):
+        if self._addr == (None, None):
+            return NoAddressSupplied()
         if self._is_connected:
             return True
         self._soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -94,6 +109,8 @@ class TCPClient:
         """
         Send all bytes of 'data' WITHOUT a header attached
         """
+        if not self._is_connected:
+            return False
         try:
             self._soc.sendall(data)
             logger.debug("Sent %d bytes to %s @ %d", len(data), self._addr[0], self._addr[1])
@@ -124,6 +141,8 @@ class TCPClient:
         """
         Receive only the number of bytes specified. Does not process the header if attached
         """
+        if not self._is_connected:
+            return False
         try:
             data = self._soc.recv(size)
             return data
@@ -145,6 +164,8 @@ class TCPClient:
         Returns a generator for iterating over the bytes of an incoming message. Header information is returned first as
         a tuple containing the size and flags. Subsequent calls return the contents of the message as it is received.
         """
+        if not self._is_connected:
+            return
         if buff_size <= 0:
             return
         bytes_recv = 0
@@ -171,10 +192,12 @@ class TCPClient:
         """
         Receive all the bytes of an incoming message in one, easy method.
         """
+        if not self._is_connected:
+            return None, None, None
         data = bytearray()
         gen = self.receive(buff_size)
         if not gen:
-            return
+            return None, None, None
         try:
             size, flags = next(gen)
         except StopIteration:
