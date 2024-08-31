@@ -9,7 +9,6 @@ import threading
 
 from .msg_flags import Flags
 from .tcp_client import TCPClient
-from .internals.message import Message
 
 logger = logging.getLogger(__name__)
 
@@ -36,16 +35,14 @@ class AutoTCPClient:
         logger.debug("Client %s is listening for new messages from %s @ %d",
                      self._client_id, self.addr()[0], self.addr()[1])
         while self._is_running:
-            size, flags, data = self._tcp_client.receive_all(self._buff_size)
-            if data is None:
+            msg = self._tcp_client.receive_all(self._buff_size)
+            if msg.data is None:
                 continue
-            if flags == 4:
+            if msg.flags == 4:
                 self._clean_up()
-                self._msg_queue.put(Message(self._client_id, size, flags, data))
+                self._msg_queue.put(msg)
                 return
-            self._msg_queue.put(Message(self._client_id, size, flags, data))
-
-
+            self._msg_queue.put(msg)
 
     def pop_msg(self, block: bool = False, timeout: int = None):
         try:

@@ -6,6 +6,7 @@ import logging
 import socket
 
 from .msg_flags import Flags
+from .message import Message
 from .internals.utils import encode_msg, decode_header
 
 logger = logging.getLogger(__name__)
@@ -192,19 +193,21 @@ class TCPClient:
         """
         Receive all the bytes of an incoming message in one, easy method.
         """
+        msg = Message(None, None, None, None)
         if not self._is_connected:
-            return None, None, None
+            return msg
         data = bytearray()
         gen = self.receive(buff_size)
         if not gen:
-            return None, None, None
+            return msg
         try:
-            size, flags = next(gen)
+            msg.size, msg.flags = next(gen)
         except StopIteration:
-            return None, None, None
+            return msg
         for chunk in gen:
             if not chunk:
-                return size, flags, None
+                return msg
             data.extend(chunk)
+        msg.data = data
         logger.debug("Received a total of %d bytes from %s @ %d", len(data), self._addr[0], self._addr[1])
-        return size, flags, data
+        return msg
