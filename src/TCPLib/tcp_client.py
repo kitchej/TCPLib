@@ -97,7 +97,7 @@ class TCPClient:
         """
         if self._is_connected:
             if warn:
-                self.send_bytes(encode_msg(b'', Flags.DISCONNECT))
+                self.send(b'', Flags.DISCONNECT)
             if self._soc is not None:
                 self._soc.close()
                 self._soc = None

@@ -36,13 +36,13 @@ class AutoTCPClient:
                      self._client_id, self.addr()[0], self.addr()[1])
         while self._is_running:
             msg = self._tcp_client.receive_all(self._buff_size)
+            msg.client_id = self._client_id
             if msg.data is None:
                 continue
             if msg.flags == 4:
                 self._clean_up()
                 self._msg_queue.put(msg)
                 return
-            msg.client_id = self._client_id
             self._msg_queue.put(msg)
 
     def pop_msg(self, block: bool = False, timeout: int = None):
