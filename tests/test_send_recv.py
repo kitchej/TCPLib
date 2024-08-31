@@ -30,22 +30,12 @@ class TestSendRecv:
         server_client_id = server.list_clients()[0]
 
         client.send(data)
+
         server_copy = server.pop_msg(block=True)
         server.send(server_client_id, server_copy.data)
 
         client_copy = client.pop_msg(block=True)
 
-        server_copy = {
-            "size": server_copy.size,
-            "flags": server_copy.flags,
-            "data": server_copy.data
-        }
-
-        client_copy = {
-            "size": client_copy.size,
-            "flags": client_copy.flags,
-            "data": client_copy.data
-        }
         return server_copy, client_copy
 
     def test_send_file(self, server, active_client):
@@ -60,16 +50,17 @@ class TestSendRecv:
         time.sleep(0.1)
         active_client.start()
         time.sleep(0.1)
-
+        server_client_id = server.list_clients()[0]
         server_msg, client_msg = self.echo(active_client, server, video)
 
-        assert server_msg["size"] == len(video)
-        assert server_msg["flags"] == 2
-        assert server_msg["data"] == video
+        assert server_msg.size == len(video)
+        assert server_msg.flags == 2
+        assert server_msg.data == video
+        assert server_msg.client_id == server_client_id
 
-        assert client_msg["size"] == len(video)
-        assert client_msg["flags"] == 2
-        assert client_msg["data"] == video
+        assert client_msg.size == len(video)
+        assert client_msg.flags == 2
+        assert client_msg.data == video
 
         active_client.stop(warn=True)
         time.sleep(0.1)

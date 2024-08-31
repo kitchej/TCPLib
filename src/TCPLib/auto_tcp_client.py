@@ -42,6 +42,7 @@ class AutoTCPClient:
                 self._clean_up()
                 self._msg_queue.put(msg)
                 return
+            msg.client_id = self._client_id
             self._msg_queue.put(msg)
 
     def pop_msg(self, block: bool = False, timeout: int = None):
