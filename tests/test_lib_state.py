@@ -23,10 +23,16 @@ class TestLibState:
         assert server.max_clients() == 0
         assert server.timeout() is None
 
+        server.set_addr("123.456.789", 9000)
+        assert server.addr() == ("123.456.789", 9000)
+        server.set_addr(HOST, PORT)
+        assert server.addr() == (HOST, PORT)
+
         server.start()
         time.sleep(0.1)
 
         assert server.addr() == (HOST, PORT)
+        assert server.set_addr(HOST, PORT) is False
         assert server.is_running()
         assert not server.is_full()
         assert server.max_clients() == 0
@@ -37,6 +43,7 @@ class TestLibState:
         assert not server.set_timeout(-1)
         assert not server.set_timeout(-25)
         assert server.timeout() == 10
+        assert server.set_timeout(None)
 
         assert server.set_max_clients(1)
         assert server.max_clients() == 1
@@ -57,7 +64,7 @@ class TestLibState:
 
         try:
             assert client_info["is_running"] is True
-            assert client_info["timeout"] == 10
+            assert client_info["timeout"] is None
             assert client_info["host"] == HOST
             assert client_info["port"] == client_proc._tcp_client._addr[1]
         except KeyError:
@@ -68,10 +75,6 @@ class TestLibState:
         assert server.is_full() is False
         assert server.client_count() == 0
 
-        server._messages.put("Hello World")
-        server._messages.put("Hello World1")
-        server._messages.put("Hello World2")
-
         server.stop()
 
         assert server.addr() == (HOST, PORT)
@@ -79,7 +82,7 @@ class TestLibState:
         assert not server.is_full()
         assert server.max_clients() == 1
 
-    def test_passive_client_state(self, dummy_server, client):
+    def test_client_state(self, dummy_server, client):
         add_file_handler(logger,
                          os.path.join(log_folder, "test_passive_client_state.log"),
                          logging.DEBUG,
@@ -90,10 +93,16 @@ class TestLibState:
         client.set_timeout(10)
         assert client.timeout() == 10
 
+        client.set_addr("123.456.789", 9000)
+        assert client.addr() == ("123.456.789", 9000)
+        client.set_addr(HOST, PORT)
+        assert client.addr() == (HOST, PORT)
+
         client.connect()
         time.sleep(0.1)
 
         assert client.addr() == (HOST, PORT)
+        assert client.set_addr(HOST, PORT) is False
         assert client.is_connected() is True
 
         client.disconnect()
@@ -101,7 +110,7 @@ class TestLibState:
         assert client.addr() == (HOST, PORT)
         assert client.is_connected() is False
 
-    def test_active_client_state(self, dummy_server, active_client):
+    def test_auto_client_state(self, dummy_server, active_client):
         add_file_handler(logger,
                          os.path.join(log_folder, "test_active_client_state.log"),
                          logging.DEBUG,
@@ -115,10 +124,16 @@ class TestLibState:
         active_client.set_timeout(10)
         assert active_client.timeout() == 10
 
+        active_client.set_addr("123.456.789", 9000)
+        assert active_client.addr() == ("123.456.789", 9000)
+        active_client.set_addr(HOST, PORT)
+        assert active_client.addr() == (HOST, PORT)
+
         active_client.start()
         time.sleep(0.1)
 
         assert active_client.is_running() is True
+        assert active_client.set_addr(HOST, PORT) is False
 
         active_client._msg_queue.put("Hello World")
         active_client._msg_queue.put("Hello World1")

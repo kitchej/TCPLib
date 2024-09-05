@@ -1,5 +1,5 @@
 """
-active_client.py
+auto_tcp_client.py
 Written by: Joshua Kitchen - 2024
 """
 
@@ -7,24 +7,17 @@ import logging
 import queue
 import threading
 
-from .passive_client import PassiveTcpClient
-from .message import Message
-
+from .msg_flags import Flags
+from .tcp_client import TCPClient
 
 logger = logging.getLogger(__name__)
 
 
-# Message flags
-COUNT = 1
-DATA = 2
-DISCONNECT = 4
-
-
-class ActiveTcpClient:
-    '''Once started, connects to the host and always listens for messages'''
-    def __init__(self, host: str, port: int, client_id: str, msg_queue: queue.Queue = None,
+class AutoTCPClient:
+    '''A basic TCP client that automatically listens for messages from a server'''
+    def __init__(self, host: str = None, port: int = None, client_id: str = None, msg_queue: queue.Queue = None,
                  buff_size: int = 4096, timeout: int = None):
-        self._tcp_client = PassiveTcpClient(host=host, port=port, timeout=timeout)
+        self._tcp_client = TCPClient(host=host, port=port, timeout=timeout)
         self._is_running = False
         self._client_id = client_id
         self._buff_size = buff_size
@@ -42,14 +35,15 @@ class ActiveTcpClient:
         logger.debug("Client %s is listening for new messages from %s @ %d",
                      self._client_id, self.addr()[0], self.addr()[1])
         while self._is_running:
-            size, flags, data = self._tcp_client.receive_all(self._buff_size)
-            if data is None:
+            msg = self._tcp_client.receive_all(self._buff_size)
+            msg.client_id = self._client_id
+            if msg.data is None:
                 continue
-            if flags == 4:
+            if msg.flags == 4:
                 self._clean_up()
+                self._msg_queue.put(msg)
                 return
-            self._msg_queue.put(Message(self._client_id, size, flags, data))
-
+            self._msg_queue.put(msg)
 
     def pop_msg(self, block: bool = False, timeout: int = None):
         try:
@@ -77,11 +71,14 @@ class ActiveTcpClient:
     def set_timeout(self, timeout: int):
         self._tcp_client.set_timeout(timeout)
 
-    def send(self, data: bytes, flags: int = DATA):
+    def send(self, data: bytes, flags: int = Flags.DATA):
         return self._tcp_client.send(data, flags)
 
     def addr(self):
         return self._tcp_client.addr()
+
+    def set_addr(self, host: str, port: int):
+        return self._tcp_client.set_addr(host, port)
 
     def is_running(self):
         return self._is_running
@@ -95,11 +92,10 @@ class ActiveTcpClient:
         self._is_running = True
         th = threading.Thread(target=self._receive_loop)
         th.start()
-        logger.info(f"Active client started. Connected to %s @ %d",
-                    self.addr()[0], self.addr()[1])
+        logger.info(f"Auto client started.")
         return result
 
     def stop(self, warn: bool = False):
         self._is_running = False
         self._tcp_client.disconnect(warn=warn)
-        logger.info(f"Active client stopped. Disconnected from %s @ %d", self.addr()[0], self.addr()[1])
+        logger.info(f"Auto client stopped.")

@@ -1,8 +1,8 @@
 import logging
 import time
 
-from src.TCPLib.active_client import ActiveTcpClient
-from src.TCPLib.passive_client import PassiveTcpClient
+from src.TCPLib.auto_tcp_client import AutoTCPClient
+from src.TCPLib.tcp_client import TCPClient
 import dev_tools.log_util as log_util
 from tqdm import tqdm
 import queue
@@ -18,20 +18,20 @@ PORT = 5000
 # HOST = "192.168.1.32"
 # PORT = 5000
 MESSAGES = queue.Queue()
-c_active = ActiveTcpClient(
+c_active = AutoTCPClient(
         HOST,
         PORT,
         MESSAGES
 )
 
-c_passive = PassiveTcpClient(
+c_passive = TCPClient(
     HOST,
     PORT
 )
 
 
 def client_list(num_clients):
-    clients = [PassiveTcpClient(host=HOST, port=PORT) for _ in range(num_clients)]
+    clients = [TCPClient(host=HOST, port=PORT) for _ in range(num_clients)]
     return clients
 
 
