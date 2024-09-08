@@ -8,7 +8,7 @@ import logging
 import os
 
 from tests.globals_for_tests import setup_log_folder
-from dev_tools.log_util import add_file_handler
+from src.log_util import add_file_handler
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)

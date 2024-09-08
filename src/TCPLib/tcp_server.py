@@ -7,34 +7,41 @@ import socket
 import threading
 import queue
 import random
+from typing import Generator
 
 from .internals.client_processor import ClientProcessor
-from .internals.utils import encode_msg, decode_header
+from .internals.utils import encode_msg
+from .message import Message
 
 logger = logging.getLogger(__name__)
 
 
 class TCPServer:
     """
-    Class for creating, maintaining, and transmitting data to multiple client connections.
+    Class for creating, maintaining, and transmitting data to multiple client connections. This class can
+    accept and use an external Queue object
     """
-    def __init__(self, host: str = None, port: int = None, max_clients: int = 0, timeout: int = None):
+    def __init__(self, host: str = None, port: int = None, max_clients: int = 0, timeout: int = None,
+                 msg_q: queue.Queue = None):
         self._max_clients = max_clients
         self._connected_clients = {}
         self._connected_clients_lock = threading.Lock()
-        self._messages = queue.Queue()
         self._is_running = False
         self._timeout = timeout
         self._addr = (host, port)
         self._soc = None
+        if msg_q:
+            self._messages = msg_q
+        else:
+            self._messages = queue.Queue()
 
     @staticmethod
-    def _generate_client_id():
+    def _generate_client_id() -> str:
         client_id = str(random.randint(0, 999999))
         client_id = int(client_id, base=36)
         return str(client_id)
 
-    def _get_client(self, client_id: str):
+    def _get_client(self, client_id: str) -> ClientProcessor | None:
         self._connected_clients_lock.acquire()
         try:
             client = self._connected_clients[client_id]
@@ -49,7 +56,7 @@ class TCPServer:
         self._connected_clients.update({client_id: client})
         self._connected_clients_lock.release()
 
-    def _create_soc(self):
+    def _create_soc(self) -> bool:
         self._soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             self._soc.bind(self._addr)
@@ -67,10 +74,10 @@ class TCPServer:
                 if self.is_full():
                     logger.debug("%s @ %d was denied connection due to server being full",
                                  client_addr[0], client_addr[1])
-                    client_soc.sendall(encode_msg(b'SERVER FULL', 4))  # Warn client they are being disconnected
+                    client_soc.sendall(encode_msg(b'SERVER FULL'))
                     client_soc.close()
                     continue
-                client_soc.sendall(encode_msg(b'0', 2))
+                client_soc.sendall(encode_msg(b'CONNECTION ACCEPTED'))
                 self._start_client_proc(self._generate_client_id(),
                                         client_addr[0],
                                         client_addr[1],
@@ -102,43 +109,66 @@ class TCPServer:
         client_proc.start()
         self._update_connected_clients(client_proc.id(), client_proc)
 
-    def addr(self):
+    def addr(self) -> tuple[str, int]:
+        """
+        Returns a tuple with the current ip (str) and the port (int) the server is listening on.
+        """
         return self._addr
 
     def set_addr(self, host: str, port: int):
+        """
+        Allows for the address to be changed after class creation. If the server is running, this function will do
+        nothing.
+        """
         if self._is_running:
-            return False
+            return
         self._addr = (host, port)
-        return True
 
-    def is_running(self):
+    def is_running(self) -> bool:
+        """
+        Returns a boolean indicating whether the server is set up and running
+        """
         return self._is_running
 
-    def client_count(self):
+    def client_count(self) -> int:
+        """
+        Returns and int representing the number of connected clients
+        """
         self._connected_clients_lock.acquire()
         count = len(self._connected_clients.keys())
         self._connected_clients_lock.release()
         return count
 
-    def is_full(self):
+    def is_full(self) -> bool:
+        """
+        Returns boolean flag indicating if the server is full
+        """
         if self._max_clients > 0:
             if self.client_count() == self._max_clients:
                 return True
         return False
 
-    def max_clients(self):
+    def max_clients(self) -> int:
+        """
+        Returns an int representing the maximum allowed connections. Zero indicates that the server will allow infinite
+        connections.
+        """
         return self._max_clients
 
-    def set_max_clients(self, new_max: int):
+    def set_max_clients(self, new_max: int) -> bool:
+        """
+        Sets the maximum number of allowed connections. The new_max argument should be a positive integer. Setting to
+        zero will allow infinite connections. Returns True on success, False if not.
+        """
         if new_max < 0:
             return False
         self._max_clients = new_max
         return True
 
-    def set_clients_timeout(self, timeout: int):
+    def set_clients_timeout(self, timeout: int) -> bool:
         """
-        Sets the timeout of the all current client sockets. The Timeout argument should be a positive integer. Passing
-        None will set the timeout to infinity.
+        Sets the timeout (in seconds) of the all current client sockets. The Timeout argument should be a positive
+        integer. Passing None will set the timeout to infinity. Returns True on success, False if not.
         See https://docs.python.org/3/library/socket.html#socket-timeouts for more information about timeouts.
         """
         if timeout is None:
@@ -152,11 +182,11 @@ class TCPServer:
                 return False
         return True
 
-    def set_server_timeout(self, timeout: int):
+    def set_server_timeout(self, timeout: int) -> bool:
         """
-        Sets timeout of the server's socket object, all current client sockets, and all new client sockets. The Timeout
-        argument should be a positive integer. Passing None will set the timeout to infinity.
-        See https://docs.python.org/3/library/socket.html#socket-timeouts for more information about timeouts.
+        Sets timeout (in seconds) of the server's socket object used for listening for new connections. The Timeout
+        argument should be a positive integer. Passing None will set the timeout to infinity. See
+        https://docs.python.org/3/library/socket.html#socket-timeouts for more information about timeouts.
         """
         if timeout is None:
             pass
@@ -164,19 +194,29 @@ class TCPServer:
             return False
         self._timeout = timeout
         self._soc.settimeout(timeout)
-        self.set_clients_timeout(timeout)
         return True
 
-    def server_timeout(self):
+    def server_timeout(self) -> int:
+        """
+        Returns the timeout of the server's socket object used for listening for new connections
+        """
         return self._timeout
 
-    def list_clients(self):
+    def list_clients(self) -> list:
+        """
+        Returns a list of with the client ids of all connected clients
+        """
         self._connected_clients_lock.acquire()
         client_list = self._connected_clients.keys()
         self._connected_clients_lock.release()
         return list(client_list)
 
-    def get_client_info(self, client_id: str):
+    def get_client_info(self, client_id: str) -> dict | None:
+        """
+        Gives basic info about a client given a client_id.
+        Returns a dictionary with keys 'is_running', 'timeout', 'addr'.
+        Returns None if a client with client_id cannot be found
+        """
         client = self._get_client(client_id)
         if not client:
             return
@@ -186,7 +226,11 @@ class TCPServer:
             "addr": (client.addr()[0], client.addr()[1]),
         }
 
-    def disconnect_client(self, client_id: str, warn: bool = True):
+    def disconnect_client(self, client_id: str) -> bool:
+        """
+        Disconnects a client with client_id. Returns False if no client with client_id was connected,
+        True on a successful disconnect.
+        """
         self._connected_clients_lock.acquire()
         try:
             client = self._connected_clients[client_id]
@@ -196,23 +240,42 @@ class TCPServer:
         del self._connected_clients[client_id]
         self._connected_clients_lock.release()
         if client.is_running():
-            client.stop(warn=warn)
+            client.stop()
         return True
 
-    def pop_msg(self, block: bool = False, timeout: int = None):
+    def pop_msg(self, block: bool = False, timeout: int = None) -> Message | None:
+        """
+        Get the next message in the queue. If block is True, this method will block until it can pop something from
+        the queue, else it will try to get a value and return None if queue is empty. If block is True and a timeout
+        is given, block until timeout expires and then return None if no item was received.
+        See  https://docs.python.org/3/library/queue.html#queue.Queue.get for more information
+        """
         try:
             return self._messages.get(block=block, timeout=timeout)
         except queue.Empty:
             return None
 
-    def get_all_msg(self, block: bool = False, timeout: int = None):
+    def get_all_msg(self, block: bool = False, timeout: int = None) -> Generator[Message | None, None, None]:
+        """
+        Generator for iterating over the queue. If block is True, each iteration of this method will block until it
+        can pop something from the queue, else it will try to get a value and yield None if queue is empty. If block
+        is True and a timeout is given, block until timeout expires and then yield None if no item was received. See
+        https://docs.python.org/3/library/queue.html#queue.Queue.get for more information
+        """
         while not self._messages.empty():
             yield self.pop_msg(block=block, timeout=timeout)
 
-    def has_messages(self):
+    def has_messages(self) -> bool:
+        """
+        Returns a boolean flag indicating whether the queue has messages in it or not
+        """
         return not self._messages.empty()
 
-    def send(self, client_id: str, data: bytes):
+    def send(self, client_id: str, data: bytes) -> bool:
+        """
+        Sends data to a connected client. Data should be a bytes-like object. Returns True on successful sending,
+        False if not or if a client with client_id could not be found.
+        """
         self._connected_clients_lock.acquire()
         try:
             client = self._connected_clients[client_id]
@@ -220,9 +283,12 @@ class TCPServer:
             self._connected_clients_lock.release()
             return False
         self._connected_clients_lock.release()
-        return client.send(data, 2)
+        return client.send(data)
 
-    def start(self):
+    def start(self) -> bool:
+        """
+        Starts the server. Returns True on successful start up, False if not.
+        """
         if self._is_running:
             return False
         if not self._create_soc():
@@ -233,6 +299,9 @@ class TCPServer:
         return True
 
     def stop(self):
+        """
+        Stops the server. If the server is not running, this method will do nothing.
+        """
         if self._is_running:
             self._connected_clients_lock.acquire()
             for client in self._connected_clients.values():

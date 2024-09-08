@@ -10,13 +10,10 @@ import socket
 import os
 import shutil
 
-# from TCPLib.tcp_client import TCPClient
-# from TCPLib.tcp_server import TCPServer
-# from TCPLib.auto_tcp_client import AutoTCPClient
-
 from src.TCPLib.tcp_client import TCPClient
 from src.TCPLib.tcp_server import TCPServer
 from src.TCPLib.auto_tcp_client import AutoTCPClient
+from src.TCPLib.internals.utils import encode_msg
 
 from tests.globals_for_tests import HOST, PORT
 
@@ -54,13 +51,10 @@ class DummyServer:
         self.soc.bind((host, port))
 
     def listen(self):
-        try:
-            self.soc.listen()
-            _, _ = self.soc.accept()
-        except ConnectionError:
-            return
-        except OSError:
-            return
+        self.soc.listen()
+        client_soc, _ = self.soc.accept()
+        time.sleep(0.1)
+        client_soc.sendall(encode_msg(b'CONNECTION ACCEPTED'))
 
     def close(self):
         self.soc.close()

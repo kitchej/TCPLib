@@ -3,7 +3,7 @@ import logging
 import os
 
 from tests.globals_for_tests import setup_log_folder, HOST, PORT
-from dev_tools.log_util import add_file_handler
+from src.log_util import add_file_handler
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -31,8 +31,8 @@ class TestLibState:
         server.start()
         time.sleep(0.1)
 
+        server.set_addr("123.456.789", 9000)
         assert server.addr() == (HOST, PORT)
-        assert server.set_addr(HOST, PORT) is False
         assert server.is_running()
         assert not server.is_full()
         assert server.max_clients() == 0
@@ -102,12 +102,12 @@ class TestLibState:
         client.set_addr(HOST, PORT)
         assert client.addr() == (HOST, PORT)
 
-        client.connect()
+        assert client.connect() is True
         time.sleep(0.1)
 
-        assert client.addr() == (HOST, PORT)
-        assert client.set_addr(HOST, PORT) is False
         assert client.is_connected() is True
+        client.set_addr(HOST, PORT)
+        assert client.addr() == (HOST, PORT)
 
         client.disconnect()
 
@@ -133,11 +133,12 @@ class TestLibState:
         active_client.set_addr(HOST, PORT)
         assert active_client.addr() == (HOST, PORT)
 
-        active_client.start()
+        assert active_client.start() is True
         time.sleep(0.1)
 
         assert active_client.is_running() is True
-        assert active_client.set_addr(HOST, PORT) is False
+        active_client.set_addr("123.456.789", 9000)
+        assert active_client.addr() == (HOST, PORT)
 
         active_client._msg_queue.put("Hello World")
         active_client._msg_queue.put("Hello World1")

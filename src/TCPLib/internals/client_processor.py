@@ -32,6 +32,3 @@ class ClientProcessor(AutoTCPClient):
         th = threading.Thread(target=self._receive_loop)
         th.start()
         logger.info(f"Processing %s @ %d as client #%s", self.addr()[0], self.addr()[1], self._client_id)
-
-    def _clean_up(self):
-        self._server_obj.disconnect_client(self._client_id, warn=False)
