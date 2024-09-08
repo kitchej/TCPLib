@@ -10,7 +10,7 @@ import logging
 import threading
 
 from tests.globals_for_tests import setup_log_folder
-from dev_tools.log_util import add_file_handler
+from src.log_util import add_file_handler
 
 
 logger = logging.getLogger()
@@ -54,17 +54,11 @@ class TestSendRecv:
         server_msg, client_msg = self.echo(active_client, server, video)
 
         assert server_msg.size == len(video)
-        assert server_msg.flags == 2
         assert server_msg.data == video
         assert server_msg.client_id == server_client_id
 
         assert client_msg.size == len(video)
-        assert client_msg.flags == 2
         assert client_msg.data == video
-
-        active_client.stop(warn=True)
-        time.sleep(0.1)
-        server.stop()
 
     @pytest.mark.parametrize('client_list', [20], indirect=True)
     def test_send_file_multi_client(self, client_list, server):

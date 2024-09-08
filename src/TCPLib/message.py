@@ -6,13 +6,8 @@ Written by: Joshua Kitchen - 2024
 
 class Message:
     """
-    A class for holding information about messages received.
+    Container class for holding the size and data of a message
     """
-    def __init__(self, client_id, size, flags, data):
-        self.client_id = client_id
+    def __init__(self, size, data):
         self.size = size
-        self.flags = flags
         self.data = data
-
-    def __str__(self):
-        return f"{self.__repr__()} client_id={self.client_id}, size={self.size}, flags={self.flags}"
