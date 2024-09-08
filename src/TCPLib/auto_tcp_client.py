@@ -14,7 +14,10 @@ logger = logging.getLogger(__name__)
 
 
 class AutoTCPClient:
-    '''A basic TCP client that automatically listens for messages from a server'''
+    """
+    A basic TCP client that automatically receives messages from a server and places it in a queue. This class can
+    accept and use an external Queue object.
+    """
     def __init__(self, host: str = None, port: int = None, client_id: str = None, msg_queue: queue.Queue = None,
                  buff_size: int = 4096, timeout: int = None):
         self._tcp_client = TCPClient(host=host, port=port, timeout=timeout)
@@ -69,6 +72,12 @@ class AutoTCPClient:
         return self._tcp_client.timeout()
 
     def set_timeout(self, timeout: int):
+        """
+        Sets how long the client will wait for messages from the server. The Timeout argument should be a positive
+        integer. Setting to zero will cause the socket to throw a TimeoutError if no data is received immediately.
+        Passing 'None' will set the timeout to infinity.
+        See https://docs.python.org/3/library/socket.html#socket-timeouts for more information about timeouts.
+        """
         self._tcp_client.set_timeout(timeout)
 
     def send(self, data: bytes, flags: int = Flags.DATA):

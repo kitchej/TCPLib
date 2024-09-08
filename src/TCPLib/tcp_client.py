@@ -17,7 +17,9 @@ class NoAddressSupplied(Exception):
 
 
 class TCPClient:
-    '''A basic TCP client'''
+    """
+    A basic TCP client.
+    """
     def __init__(self, host: str = None, port: int = None, timeout: int = None):
         self._soc = None
         self._addr = (host, port)
@@ -43,6 +45,12 @@ class TCPClient:
         return self._timeout
 
     def set_timeout(self, timeout: int):
+        """
+        Sets how long the client will wait for messages from the server. The Timeout argument should be a positive
+        integer. Setting to zero will cause network operations to fail if no data is received immediately.
+        Passing 'None' will set the timeout to infinity.
+        See https://docs.python.org/3/library/socket.html#socket-timeouts for more information about timeouts.
+        """
         self._timeout = timeout
         if self._soc:
             self._soc.settimeout(self._timeout)

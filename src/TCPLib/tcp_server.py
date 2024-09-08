@@ -1,9 +1,6 @@
 """
 tcp_server.py
 Written by: Joshua Kitchen - 2024
-
-TODO:
-    - Better system for controlling the timeout of the server and all its client connections
 """
 import logging
 import socket
@@ -12,14 +9,15 @@ import queue
 import random
 
 from .internals.client_processor import ClientProcessor
-from .internals.utils import encode_msg
+from .internals.utils import encode_msg, decode_header
 
 logger = logging.getLogger(__name__)
 
 
 class TCPServer:
-    '''Class for creating, maintaining, and transmitting data to multiple client connections.'''
-
+    """
+    Class for creating, maintaining, and transmitting data to multiple client connections.
+    """
     def __init__(self, host: str = None, port: int = None, max_clients: int = 0, timeout: int = None):
         self._max_clients = max_clients
         self._connected_clients = {}
@@ -53,7 +51,6 @@ class TCPServer:
 
     def _create_soc(self):
         self._soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._soc.settimeout(self._timeout)
         try:
             self._soc.bind(self._addr)
         except socket.gaierror:
@@ -74,22 +71,22 @@ class TCPServer:
                     client_soc.close()
                     continue
                 client_soc.sendall(encode_msg(b'0', 2))
-                self.start_client_proc(self._generate_client_id(),
-                                       client_addr[0],
-                                       client_addr[1],
-                                       client_soc)
+                self._start_client_proc(self._generate_client_id(),
+                                        client_addr[0],
+                                        client_addr[1],
+                                        client_soc)
             except OSError:
                 logger.exception(f"Exception occurred while listening on %s @ %d", self._addr[0], self._addr[1])
                 break
 
     def _on_connect(self, *args, **kwargs):
-        '''
-        Overridable method that runs once the client is connected. Returning false from this method will
+        """
+        Overridable method that runs once the client is connected. Returning 'False' from this method will
         disconnect the client and abort client setup.
-        '''
+        """
         pass
 
-    def start_client_proc(self, client_id: str, host: str, port: int, client_soc: socket.socket):
+    def _start_client_proc(self, client_id: str, host: str, port: int, client_soc: socket.socket):
         result = self._on_connect(client_soc, client_id, host, port)
         if result is False:
             client_soc.close()
@@ -138,13 +135,16 @@ class TCPServer:
         self._max_clients = new_max
         return True
 
-    def set_timeout(self, timeout: int):
+    def set_clients_timeout(self, timeout: int):
+        """
+        Sets the timeout of the all current client sockets. The Timeout argument should be a positive integer. Passing
+        'None' will set the timeout to infinity.
+        See https://docs.python.org/3/library/socket.html#socket-timeouts for more information about timeouts.
+        """
         if timeout is None:
             pass
         elif timeout < 0:
             return False
-        self._timeout = timeout
-
         for client_id in self.list_clients():
             client_proc = self._get_client(client_id)
             result = client_proc.set_timeout(timeout)
@@ -152,7 +152,22 @@ class TCPServer:
                 return False
         return True
 
-    def timeout(self):
+    def set_server_timeout(self, timeout: int):
+        """
+        Sets timeout of the server's socket object, all current client sockets, and all new client sockets. The Timeout
+        argument should be a positive integer. Passing 'None' will set the timeout to infinity.
+        See https://docs.python.org/3/library/socket.html#socket-timeouts for more information about timeouts.
+        """
+        if timeout is None:
+            pass
+        elif timeout < 0:
+            return False
+        self._timeout = timeout
+        self._soc.settimeout(timeout)
+        self.set_clients_timeout(timeout)
+        return True
+
+    def server_timeout(self):
         return self._timeout
 
     def list_clients(self):
@@ -168,8 +183,7 @@ class TCPServer:
         return {
             "is_running": client.is_running(),
             "timeout": client.timeout(),
-            "host": client.addr()[0],
-            "port": client.addr()[1]
+            "addr": (client.addr()[0], client.addr()[1]),
         }
 
     def disconnect_client(self, client_id: str, warn: bool = True):

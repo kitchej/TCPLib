@@ -7,17 +7,15 @@ Written by: Joshua Kitchen - 2024
 def encode_msg(data: bytes, flags: int):
     """
     MSG STRUCTURE:
-    [Header: 5 bytes] [Data: inf bytes]
+    [Header (5 bytes)] [Data]
 
     HEADER STRUCTURE:
-    [Size: 4 bytes] [Flags: 1 Byte -> 1 ----
-                                      1     |
-                                      1     | --- CURRENTLY UNUSED
-                                      1     |
-                                      1 ____
-                                      1: DISCONNECTING
-                                      1: TRANSMITTING DATA
-                                      1: REPORTING BYTES RECEIVED]
+    [Size (4 bytes)] [Flags (1 Byte)]
+
+    FLAGS:
+        4: DISCONNECTING
+        2: TRANSMITTING DATA
+        1: REPORTING BYTES RECEIVED
     """
     msg = bytearray()
     size = len(data).to_bytes(4, byteorder='big')

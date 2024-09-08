@@ -10,13 +10,6 @@ import os
 from tests.globals_for_tests import setup_log_folder
 from dev_tools.log_util import add_file_handler
 
-"""
-TO TEST:
-- Test that server connection limits are enforced
-- Test that clients can be disconnected without crashing the client
-- 
-"""
-
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 log_folder = setup_log_folder("TestClientMgmt")

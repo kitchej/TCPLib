@@ -21,7 +21,7 @@ class TestLibState:
         assert not server.is_running()
         assert not server.is_full()
         assert server.max_clients() == 0
-        assert server.timeout() is None
+        assert server.server_timeout() is None
 
         server.set_addr("123.456.789", 9000)
         assert server.addr() == ("123.456.789", 9000)
@@ -36,14 +36,14 @@ class TestLibState:
         assert server.is_running()
         assert not server.is_full()
         assert server.max_clients() == 0
-        assert server.timeout() is None
+        assert server.server_timeout() is None
 
-        assert server.set_timeout(10)
-        assert server.timeout() == 10
-        assert not server.set_timeout(-1)
-        assert not server.set_timeout(-25)
-        assert server.timeout() == 10
-        assert server.set_timeout(None)
+        assert server.set_server_timeout(10)
+        assert server.server_timeout() == 10
+        assert not server.set_server_timeout(-1)
+        assert not server.set_server_timeout(-25)
+        assert server.server_timeout() == 10
+        assert server.set_server_timeout(None)
 
         assert server.set_max_clients(1)
         assert server.max_clients() == 1
@@ -65,10 +65,14 @@ class TestLibState:
         try:
             assert client_info["is_running"] is True
             assert client_info["timeout"] is None
-            assert client_info["host"] == HOST
-            assert client_info["port"] == client_proc._tcp_client._addr[1]
+            assert client_info["addr"] == (HOST, client_proc._tcp_client._addr[1])
         except KeyError:
             assert False
+
+        server.set_clients_timeout(10)
+        assert server.get_client_info(conn_client)["timeout"] == 10
+        assert server.set_clients_timeout(-1) is False
+        assert server.get_client_info(conn_client)["timeout"] == 10
 
         server.disconnect_client(conn_client)
 

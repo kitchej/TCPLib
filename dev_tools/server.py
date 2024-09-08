@@ -30,8 +30,8 @@ def decode_header(header: bytes):
     return size, flags
 
 
-# HOST = "127.0.0.1"
-HOST = "192.168.1.37"
+HOST = "127.0.0.1"
+# HOST = "192.168.1.37"
 PORT = 5000
 
 # HOST = "192.168.1.32"
@@ -99,6 +99,7 @@ def use_real(message):
         PORT
     )
     s.start()
+    s.set_server_timeout(10)
 
     while True:
         logging.info(f"Waiting for clients: {s.client_count()} clients connected")
@@ -174,15 +175,10 @@ def send_file(filepath):
     s.send(client_id, data)
 
 
-
-
-
-print(os.getcwd())
-
 # use_dummy(text)
 # use_dummy(video)
 
-# use_real(text)
+use_real(b"Hello World")
 # use_real(video)
 
 # use_interface()

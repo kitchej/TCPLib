@@ -14,7 +14,9 @@ logger = logging.getLogger(__name__)
 
 
 class ClientProcessor(AutoTCPClient):
-    '''Maintains a single client connection for the server'''
+    """
+    Maintains a single client connection for the server.
+    """
     def __init__(self, client_id, host, port, msg_queue: queue.Queue, client_soc, server_obj,
                  buff_size=4096, timeout: int = None):
         AutoTCPClient.__init__(self,
