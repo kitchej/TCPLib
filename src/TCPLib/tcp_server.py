@@ -138,7 +138,7 @@ class TCPServer:
     def set_clients_timeout(self, timeout: int):
         """
         Sets the timeout of the all current client sockets. The Timeout argument should be a positive integer. Passing
-        'None' will set the timeout to infinity.
+        None will set the timeout to infinity.
         See https://docs.python.org/3/library/socket.html#socket-timeouts for more information about timeouts.
         """
         if timeout is None:
@@ -155,7 +155,7 @@ class TCPServer:
     def set_server_timeout(self, timeout: int):
         """
         Sets timeout of the server's socket object, all current client sockets, and all new client sockets. The Timeout
-        argument should be a positive integer. Passing 'None' will set the timeout to infinity.
+        argument should be a positive integer. Passing None will set the timeout to infinity.
         See https://docs.python.org/3/library/socket.html#socket-timeouts for more information about timeouts.
         """
         if timeout is None:

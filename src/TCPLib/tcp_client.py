@@ -27,7 +27,11 @@ class TCPClient:
         self._is_connected = False
 
     @classmethod
-    def from_socket(cls, soc: socket.socket = None):
+    def from_socket(cls, soc: socket.socket):
+        """
+        Allows for a client to be created from a socket object.
+        The socket must be initialized and connected.
+        """
         out = cls(None, None, soc.gettimeout())
         out._soc = soc
         out._addr = soc.getsockname()
@@ -68,6 +72,11 @@ class TCPClient:
         return self._addr
 
     def connect(self):
+        """
+        Initiates connection to the server. Raises TimeoutError, ConnectionError, and socket.gaierror.
+        Returns False if server object itself terminates the connection and True if the connection was
+        successfully opened.
+        """
         if self._addr == (None, None):
             return NoAddressSupplied()
         if self._is_connected:
@@ -87,13 +96,15 @@ class TCPClient:
         except TimeoutError as e:
             self._clean_up()
             logger.error("Timed out trying to connect to %s @ %d", self._addr[0], self._addr[1])
-            return e
+            raise e
         except ConnectionError as e:
+            logger.error("Connection error while trying to connect to %s @ %d", self._addr[0], self._addr[1])
             self._clean_up()
-            return e
+            raise e
         except socket.gaierror as e:
+            logger.exception("Exception while trying to connect to %s @ %d", self._addr[0], self._addr[1])
             self._clean_up()
-            return e
+            raise e
         self._is_connected = True
         logger.info("Successfully connected to %s @ %d", self._addr[0], self._addr[1])
         return True

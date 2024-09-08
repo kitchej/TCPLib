@@ -75,7 +75,7 @@ class AutoTCPClient:
         """
         Sets how long the client will wait for messages from the server. The Timeout argument should be a positive
         integer. Setting to zero will cause the socket to throw a TimeoutError if no data is received immediately.
-        Passing 'None' will set the timeout to infinity.
+        Passing None will set the timeout to infinity.
         See https://docs.python.org/3/library/socket.html#socket-timeouts for more information about timeouts.
         """
         self._tcp_client.set_timeout(timeout)
@@ -93,6 +93,11 @@ class AutoTCPClient:
         return self._is_running
 
     def start(self):
+        """
+        Initiates connection to the server and starts the receiving loop on a new thread. Raises TimeoutError,
+        ConnectionError, and socket.gaierror. Returns False if server object itself terminates the connection and
+        True if the connection was successfully opened.
+        """
         if self._is_running:
             return False
         result = self._tcp_client.connect()
