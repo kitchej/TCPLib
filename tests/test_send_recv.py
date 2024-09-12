@@ -26,19 +26,14 @@ class TestSendRecv:
 
     @staticmethod
     def echo(client, server, data):
-        time.sleep(0.1)
-        server_client_id = server.list_clients()[0]
-
         client.send(data)
-
+        time.sleep(0.1)
         server_copy = server.pop_msg(block=True)
-        server.send(server_client_id, server_copy.data)
-
-        client_copy = client.pop_msg(block=True)
-
+        server.send(server_copy.client_id, server_copy.data)
+        client_copy = client.receive_all()
         return server_copy, client_copy
 
-    def test_send_file(self, server, active_client):
+    def test_send_file(self, server, client):
         add_file_handler(logger,
                          os.path.join(log_folder, "test_send_file.log"),
                          logging.DEBUG,
@@ -48,10 +43,10 @@ class TestSendRecv:
 
         server.start()
         time.sleep(0.1)
-        active_client.start()
+        client.connect()
         time.sleep(0.1)
         server_client_id = server.list_clients()[0]
-        server_msg, client_msg = self.echo(active_client, server, video)
+        server_msg, client_msg = self.echo(client, server, video)
 
         assert server_msg.size == len(video)
         assert server_msg.data == video

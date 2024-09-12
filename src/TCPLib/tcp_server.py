@@ -9,8 +9,8 @@ import queue
 import random
 from typing import Generator
 
-from .internals.client_processor import ClientProcessor
-from .internals.utils import encode_msg
+from .client_processor import ClientProcessor
+from .utils import encode_msg
 from .message import Message
 
 logger = logging.getLogger(__name__)
@@ -78,10 +78,7 @@ class TCPServer:
                     client_soc.close()
                     continue
                 client_soc.sendall(encode_msg(b'CONNECTION ACCEPTED'))
-                self._start_client_proc(self._generate_client_id(),
-                                        client_addr[0],
-                                        client_addr[1],
-                                        client_soc)
+                self._start_client_proc(self._generate_client_id(), client_soc)
             except OSError:
                 logger.exception(f"Exception occurred while listening on %s @ %d", self._addr[0], self._addr[1])
                 break
@@ -93,20 +90,16 @@ class TCPServer:
         """
         pass
 
-    def _start_client_proc(self, client_id: str, host: str, port: int, client_soc: socket.socket):
-        result = self._on_connect(client_soc, client_id, host, port)
+    def _start_client_proc(self, client_id: str, client_soc: socket.socket):
+        result = self._on_connect(client_soc, client_id)
         if result is False:
             client_soc.close()
             return
         client_proc = ClientProcessor(client_id=client_id,
-                                      host=host,
-                                      port=port,
                                       client_soc=client_soc,
-                                      msg_queue=self._messages,
+                                      msg_q=self._messages,
                                       server_obj=self,
                                       timeout=self._timeout)
-
-        client_proc.start()
         self._update_connected_clients(client_proc.id(), client_proc)
 
     def addr(self) -> tuple[str, int]:

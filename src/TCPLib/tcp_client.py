@@ -7,7 +7,7 @@ import socket
 from typing import Generator
 
 from .message import Message
-from .internals.utils import encode_msg, decode_header
+from .utils import encode_msg, decode_header
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ class TCPClient:
         """
         out = cls(None, None, soc.gettimeout())
         out._soc = soc
-        out._addr = soc.getsockname()
+        out._addr = soc.getpeername()
         out._is_connected = True
         return out
 
@@ -154,7 +154,7 @@ class TCPClient:
             self._soc.sendall(data)
             logger.debug("Sent %d bytes to %s @ %d", len(data), self._addr[0], self._addr[1])
             return True
-        except ConnectionError as e:
+        except ConnectionResetError or ConnectionAbortedError or ConnectionError as e:
             self._clean_up()
             logger.exception("Exception occurred while sending to %s @ %d", self._addr[0], self._addr[1])
             raise e
@@ -186,7 +186,7 @@ class TCPClient:
         try:
             data = self._soc.recv(size)
             return data
-        except ConnectionError as e:
+        except ConnectionResetError or ConnectionAbortedError or ConnectionError as e:
             self._clean_up()
             logger.exception("Exception occurred while receiving from to %s @ %d", self._addr[0], self._addr[1])
             raise e

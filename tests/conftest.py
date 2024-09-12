@@ -12,8 +12,7 @@ import shutil
 
 from src.TCPLib.tcp_client import TCPClient
 from src.TCPLib.tcp_server import TCPServer
-from src.TCPLib.auto_tcp_client import AutoTCPClient
-from src.TCPLib.internals.utils import encode_msg
+from src.TCPLib.utils import encode_msg
 
 from tests.globals_for_tests import HOST, PORT
 
@@ -99,29 +98,9 @@ def client():
 
 
 @pytest.fixture
-def active_client():
-    c = AutoTCPClient(
-        host=HOST,
-        port=PORT,
-        client_id="Active_Client_Standalone"
-    )
-    yield c
-    c.stop()
-
-
-@pytest.fixture
 def client_list(request):
     num_clients = request.param
     clients = [TCPClient(host=HOST, port=PORT) for _ in range(num_clients)]
     yield clients
     for client in clients:
         client.disconnect()
-
-
-@pytest.fixture
-def active_client_list(request):
-    num_clients = request.param
-    clients = [AutoTCPClient(host=HOST, port=PORT, client_id=f"Client-{i}") for i in range(num_clients)]
-    yield clients
-    for client in clients:
-        client.stop()
