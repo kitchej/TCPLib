@@ -40,7 +40,9 @@ class TCPClient:
         return out
 
     def _clean_up(self):
-        self.disconnect()
+        if self._soc is not None:
+            self._soc.close()
+            self._soc = None
         self._is_connected = False
 
     def is_connected(self) -> bool:
@@ -51,7 +53,7 @@ class TCPClient:
 
     def timeout(self) -> int | None:
         """
-        Returns an int representing the current timeout value.
+        Returns an integer representing the current timeout value.
         """
         return self._timeout
 
@@ -96,25 +98,24 @@ class TCPClient:
             raise NoAddressSupplied()
         if self._is_connected:
             return False
-
         self._soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._soc.settimeout(self._timeout)
-        logger.info("Attempting to connect to %s @ %d", self._addr[0], self._addr[1])
 
+        logger.info("Attempting to connect to %s @ %d", self._addr[0], self._addr[1])
         try:
             self._soc.connect(self._addr)
             size = decode_header(self._soc.recv(4))
             msg = self._soc.recv(size)
         except TimeoutError as e:
             self._clean_up()
-            logger.error("Timed out trying to connect to %s @ %d", self._addr[0], self._addr[1])
             raise e
         except ConnectionError as e:
-            logger.error("Connection error while trying to connect to %s @ %d", self._addr[0], self._addr[1])
             self._clean_up()
             raise e
         except socket.gaierror as e:
-            logger.exception("Exception while trying to connect to %s @ %d", self._addr[0], self._addr[1])
+            self._clean_up()
+            raise e
+        except OSError as e:
             self._clean_up()
             raise e
 
@@ -124,8 +125,8 @@ class TCPClient:
             return True
         elif msg == b'SERVER FULL':
             self._clean_up()
-            logger.error("Connection to %s @ %d was denied due to the server being full",
-                         self._addr[0], self._addr[1])
+            logger.info("Connection to %s @ %d was denied due to the server being full",
+                        self._addr[0], self._addr[1])
             return False
         else:
             self._clean_up()
@@ -134,14 +135,11 @@ class TCPClient:
 
     def disconnect(self):
         """
-        Disconnect from the currently connected server. If no connection is openened, this method does nothing.
+        Disconnect from the currently connected server. If no connection is opened, this method does nothing.
         """
         if self._is_connected:
-            if self._soc is not None:
-                self._soc.close()
-                self._soc = None
+            self._clean_up()
             logger.info("Disconnected from %s @ %d", self._addr[0], self._addr[1])
-            self._is_connected = False
 
     def send_bytes(self, data: bytes):
         """
@@ -152,31 +150,29 @@ class TCPClient:
             return False
         try:
             self._soc.sendall(data)
-            logger.debug("Sent %d bytes to %s @ %d", len(data), self._addr[0], self._addr[1])
             return True
-        except ConnectionResetError or ConnectionAbortedError or ConnectionError as e:
-            self._clean_up()
-            logger.exception("Exception occurred while sending to %s @ %d", self._addr[0], self._addr[1])
-            raise e
-        except socket.gaierror as e:
-            self._clean_up()
-            logger.exception("Exception occurred while sending to %s @ %d", self._addr[0], self._addr[1])
-            raise e
-        except OSError as e:
-            self._clean_up()
-            logger.exception("Exception occurred while sending to %s @ %d", self._addr[0], self._addr[1])
-            raise e
         except AttributeError:  # Socket was closed from another thread
             self._clean_up()
             return False
+        except TimeoutError as e:
+            self._clean_up()
+            raise e
+        except ConnectionError as e:
+            self._clean_up()
+            raise e
+        except socket.gaierror as e:
+            self._clean_up()
+            raise e
+        except OSError as e:
+            self._clean_up()
+            raise e
 
     def send(self, data: bytes) -> bool:
         """
         Send all bytes of the data argument WITH a header attached. Returns True on successful transmission,
         False on failed transmission. Raises TimeoutError, ConnectionError, socket.gaierror, and OSError.
         """
-        result = self.send_bytes(encode_msg(data))
-        return result
+        return self.send_bytes(encode_msg(data))
 
     def receive_bytes(self, size: int) -> bytes | None:
         """
@@ -186,27 +182,27 @@ class TCPClient:
         try:
             data = self._soc.recv(size)
             return data
-        except ConnectionResetError or ConnectionAbortedError or ConnectionError as e:
-            self._clean_up()
-            logger.exception("Exception occurred while receiving from to %s @ %d", self._addr[0], self._addr[1])
-            raise e
-        except socket.gaierror as e:
-            self._clean_up()
-            logger.exception("Exception occurred while receiving from to %s @ %d", self._addr[0], self._addr[1])
-            raise e
-        except OSError as e:
-            self._clean_up()
-            logger.exception("Exception occurred while receiving from %s @ %d", self._addr[0], self._addr[1])
-            raise e
         except AttributeError:  # Socket was closed from another thread
             self._clean_up()
             return
+        except TimeoutError as e:
+            self._clean_up()
+            raise e
+        except ConnectionError as e:
+            self._clean_up()
+            raise e
+        except socket.gaierror as e:
+            self._clean_up()
+            raise e
+        except OSError as e:
+            self._clean_up()
+            raise e
 
     def receive(self, buff_size: int = 4096) -> Generator[bytes | int, None, None]:
         """
-        Returns a generator for iterating over the bytes of an incoming message. An int representing the message size is
-        yielded first. Subsequent calls yield the contents of the message as it is received. Raises TimeoutError,
-        ConnectionError, socket.gaierror, and OSError.
+        Returns a generator for iterating over the bytes of an incoming message. An integer representing the message
+        size is yielded first. Subsequent calls yield the contents of the message as it is received. Raises
+        TimeoutError, ConnectionError, socket.gaierror, and OSError.
         """
         if not self._is_connected:
             return
@@ -217,8 +213,8 @@ class TCPClient:
         if not header:
             return
         size = decode_header(header)
-        logger.info("Incoming message from %s @ %d, SIZE=%d",
-                    self._addr[0], self._addr[1], size)
+        logger.debug("Incoming message from %s @ %d, SIZE=%d",
+                     self._addr[0], self._addr[1], size)
         yield size
         if size < buff_size:
             buff_size = size

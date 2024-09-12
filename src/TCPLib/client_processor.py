@@ -18,6 +18,7 @@ class ClientProcessor:
     """
     Maintains a single client connection for the server.
     """
+
     def __init__(self, client_id, client_soc: socket.socket, msg_q: queue.Queue, server_obj,
                  buff_size=4096, timeout: int = None):
         self._client_id = client_id
@@ -37,21 +38,15 @@ class ClientProcessor:
         while self._is_running:
             try:
                 msg = self._tcp_client.receive_all(self._buff_size)
-            # All below exceptions happen normally when disconnecting, so we don't want to log them most of the
-            # time. However, they obviously can still happen at anytime, so I've decided I'll only log them if debug
-            # mode is active in the logging module. I don't know if that will come back to bite me later, but I don't
-            # know the best way to handle it right now.
-            except ConnectionAbortedError or ConnectionResetError or ConnectionError:
-                if logger.level == logging.DEBUG:
-                    logger.exception("Exception while receiving from %s @ %d", self._tcp_client.addr()[0],
-                                     self._tcp_client.addr()[1])
+            except ConnectionError as e:
+                logger.debug("Exception while receiving from %s @ %d", self._tcp_client.addr()[0],
+                             self._tcp_client.addr()[1], exc_info=e)
                 self.stop()
                 self._msg_q.put(Message(0, None, self._client_id))
                 return
-            except OSError:
-                if logger.level == logging.DEBUG:
-                    logger.exception("Exception while receiving from %s @ %d", self._tcp_client.addr()[0],
-                                     self._tcp_client.addr()[1])
+            except OSError as e:
+                logger.debug("Exception while receiving from %s @ %d", self._tcp_client.addr()[0],
+                             self._tcp_client.addr()[1], exc_info=e)
                 self.stop()
                 self._msg_q.put(Message(0, None, self._client_id))
                 return

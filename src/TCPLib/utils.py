@@ -18,3 +18,10 @@ def encode_msg(data: bytes) -> bytearray:
 
 def decode_header(header: bytes) -> int:
     return int.from_bytes(header, byteorder='big')
+
+
+if __name__ == '__main__':
+    try:
+        raise ConnectionAbortedError
+    except ConnectionError as e:
+        print("Caught")
