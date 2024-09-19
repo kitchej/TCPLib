@@ -10,18 +10,10 @@ def encode_msg(data: bytes) -> bytearray:
     [Size (4 bytes)] [Data]
     """
     msg = bytearray()
-    size = len(data).to_bytes(4, byteorder='big')
-    msg.extend(size)
+    msg.extend(len(data).to_bytes(4, byteorder='big'))
     msg.extend(data)
     return msg
 
 
 def decode_header(header: bytes) -> int:
     return int.from_bytes(header, byteorder='big')
-
-
-if __name__ == '__main__':
-    try:
-        raise ConnectionAbortedError
-    except ConnectionError as e:
-        print("Caught")

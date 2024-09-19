@@ -21,19 +21,20 @@ class TCPServer:
     Class for creating, maintaining, and transmitting data to multiple client connections. This class can
     accept and use an external Queue object
     """
+
     def __init__(self, host: str = None, port: int = None, max_clients: int = 0, timeout: int = None,
                  msg_q: queue.Queue = None):
-        self._max_clients = max_clients
-        self._connected_clients = {}
-        self._connected_clients_lock = threading.Lock()
-        self._is_running = False
-        self._timeout = timeout
         self._addr = (host, port)
-        self._soc = None
+        self._max_clients = max_clients
+        self._timeout = timeout
         if msg_q:
             self._messages = msg_q
         else:
             self._messages = queue.Queue()
+        self._soc = None
+        self._is_running = False
+        self._connected_clients = {}
+        self._connected_clients_lock = threading.Lock()
 
     @staticmethod
     def _generate_client_id() -> str:
@@ -72,8 +73,8 @@ class TCPServer:
                 client_soc, client_addr = self._soc.accept()
                 logger.info("Accepted Connection from %s @ %d", client_addr[0], client_addr[1])
                 if self.is_full():
-                    logger.debug("%s @ %d was denied connection due to server being full",
-                                 client_addr[0], client_addr[1])
+                    logger.warning("%s @ %d was denied connection due to server being full",
+                                   client_addr[0], client_addr[1])
                     client_soc.sendall(encode_msg(b'SERVER FULL'))
                     client_soc.close()
                     continue
@@ -181,10 +182,9 @@ class TCPServer:
         argument should be a positive integer. Passing None will set the timeout to infinity. See
         https://docs.python.org/3/library/socket.html#socket-timeouts for more information about timeouts.
         """
-        if timeout is None:
-            pass
-        elif timeout < 0:
-            return False
+        if timeout is not None:
+            if timeout < 0:
+                return False
         self._timeout = timeout
         self._soc.settimeout(timeout)
         return True

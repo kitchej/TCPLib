@@ -16,6 +16,10 @@ class NoAddressSupplied(Exception):
     pass
 
 
+class NegativeBufferValue(Exception):
+    pass
+
+
 class TCPClient:
     """
     A basic TCP client.
@@ -64,10 +68,9 @@ class TCPClient:
         Passing 'None' will set the timeout to infinity. Returns True on success, False if not. See
         https://docs.python.org/3/library/socket.html#socket-timeouts for more information about timeouts.
         """
-        if timeout is None:
-            pass
-        elif timeout < 0:
-            return False
+        if timeout is not None:
+            if timeout < 0:
+                return False
         self._timeout = timeout
         if self._soc:
             self._soc.settimeout(self._timeout)
@@ -95,7 +98,8 @@ class TCPClient:
         accepted.
         """
         if self._addr == (None, None):
-            raise NoAddressSupplied()
+            raise NoAddressSupplied("TCPClient was not given an address to connect to. Either pass it to __init__() or "
+                                    "call set_addr()")
         if self._is_connected:
             return False
         self._soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -207,10 +211,10 @@ class TCPClient:
         if not self._is_connected:
             return
         if buff_size <= 0:
-            return
+            raise NegativeBufferValue("Argument buff_size must be a non-zero, positive integer")
         bytes_recv = 0
         header = self.receive_bytes(4)
-        if not header:
+        if not header:  # Socket was closed from another thread
             return
         size = decode_header(header)
         logger.debug("Incoming message from %s @ %d, SIZE=%d",
@@ -220,7 +224,7 @@ class TCPClient:
             buff_size = size
         while bytes_recv < size:
             data = self.receive_bytes(buff_size)
-            if not data:
+            if not data:  # Socket was closed from another thread
                 return
             bytes_recv += len(data)
             remaining = size - bytes_recv
