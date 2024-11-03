@@ -67,12 +67,12 @@ class TCPServer:
         return True
 
     def _mainloop(self):
-        while self.is_running():
+        while self.is_running:
             try:
                 self._soc.listen()
                 client_soc, client_addr = self._soc.accept()
                 logger.info("Accepted Connection from %s @ %d", client_addr[0], client_addr[1])
-                if self.is_full():
+                if self.is_full:
                     logger.warning("%s @ %d was denied connection due to server being full",
                                    client_addr[0], client_addr[1])
                     client_soc.sendall(encode_msg(b'SERVER FULL'))
@@ -101,29 +101,75 @@ class TCPServer:
                                       msg_q=self._messages,
                                       server_obj=self,
                                       timeout=self._timeout)
-        self._update_connected_clients(client_proc.id(), client_proc)
+        self._update_connected_clients(client_proc.id, client_proc)
 
+    @property
     def addr(self) -> tuple[str, int]:
         """
         Returns a tuple with the current ip (str) and the port (int) the server is listening on.
         """
         return self._addr
 
-    def set_addr(self, host: str, port: int):
+    @addr.setter
+    def addr(self, value: tuple[str, int]):
         """
         Allows for the address to be changed after class creation. If the server is running, this function will do
         nothing.
         """
         if self._is_running:
             return
-        self._addr = (host, port)
+        self._addr = value
 
+    @property
     def is_running(self) -> bool:
         """
         Returns a boolean indicating whether the server is set up and running
         """
         return self._is_running
 
+    @is_running.setter
+    def is_running(self, value):
+        return
+
+    @property
+    def max_clients(self) -> int:
+        """
+        Returns an int representing the maximum allowed connections. Zero indicates that the server will allow infinite
+        connections.
+        """
+        return self._max_clients
+
+    @max_clients.setter
+    def max_clients(self, new_max: int):
+        """
+        Sets the maximum number of allowed connections. The new_max argument should be a positive integer. Setting to
+        zero will allow infinite connections.
+        """
+        if new_max < 0:
+            raise ValueError("Value for max_clients should be a positive integer")
+        self._max_clients = new_max
+
+    @property
+    def timeout(self):
+        """
+        Returns the timeout of the server's socket object used for listening for new connections
+        """
+        return self._timeout
+
+    @timeout.setter
+    def timeout(self, timeout: int):
+        """
+        Sets timeout (in seconds) of the server's socket object used for listening for new connections. The Timeout
+        argument should be a positive integer. Passing None will set the timeout to infinity. See
+        https://docs.python.org/3/library/socket.html#socket-timeouts for more information about timeouts.
+        """
+        if timeout is not None:
+            if timeout < 0:
+                raise ValueError("Value for timeout should be a positive integer")
+        self._timeout = timeout
+        self._soc.settimeout(timeout)
+
+    @property
     def client_count(self) -> int:
         """
         Returns and int representing the number of connected clients
@@ -133,31 +179,23 @@ class TCPServer:
         self._connected_clients_lock.release()
         return count
 
+    @client_count.setter
+    def client_count(self, value):
+        return
+
+    @property
     def is_full(self) -> bool:
         """
         Returns boolean flag indicating if the server is full
         """
         if self._max_clients > 0:
-            if self.client_count() == self._max_clients:
+            if self.client_count == self._max_clients:
                 return True
         return False
 
-    def max_clients(self) -> int:
-        """
-        Returns an int representing the maximum allowed connections. Zero indicates that the server will allow infinite
-        connections.
-        """
-        return self._max_clients
-
-    def set_max_clients(self, new_max: int) -> bool:
-        """
-        Sets the maximum number of allowed connections. The new_max argument should be a positive integer. Setting to
-        zero will allow infinite connections. Returns True on success, False if not.
-        """
-        if new_max < 0:
-            return False
-        self._max_clients = new_max
-        return True
+    @is_full.setter
+    def is_full(self, value):
+        return
 
     def set_clients_timeout(self, timeout: int) -> bool:
         """
@@ -171,29 +209,10 @@ class TCPServer:
             return False
         for client_id in self.list_clients():
             client_proc = self._get_client(client_id)
-            result = client_proc.set_timeout(timeout)
+            result = client_proc.timeout = timeout
             if not result:
                 return False
         return True
-
-    def set_server_timeout(self, timeout: int) -> bool:
-        """
-        Sets timeout (in seconds) of the server's socket object used for listening for new connections. The Timeout
-        argument should be a positive integer. Passing None will set the timeout to infinity. See
-        https://docs.python.org/3/library/socket.html#socket-timeouts for more information about timeouts.
-        """
-        if timeout is not None:
-            if timeout < 0:
-                return False
-        self._timeout = timeout
-        self._soc.settimeout(timeout)
-        return True
-
-    def server_timeout(self) -> int:
-        """
-        Returns the timeout of the server's socket object used for listening for new connections
-        """
-        return self._timeout
 
     def list_clients(self) -> list:
         """
@@ -214,9 +233,9 @@ class TCPServer:
         if not client:
             return
         return {
-            "is_running": client.is_running(),
-            "timeout": client.timeout(),
-            "addr": (client.addr()[0], client.addr()[1]),
+            "is_running": client.is_running,
+            "timeout": client.timeout,
+            "addr": client.addr,
         }
 
     def disconnect_client(self, client_id: str) -> bool:
@@ -232,7 +251,7 @@ class TCPServer:
             return False
         del self._connected_clients[client_id]
         self._connected_clients_lock.release()
-        if client.is_running():
+        if client.is_running:
             client.stop()
         return True
 
