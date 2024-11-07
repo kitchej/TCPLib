@@ -39,14 +39,14 @@ class ClientProcessor:
             try:
                 msg = self._tcp_client.receive_all(self._buff_size)
             except ConnectionError as e:
-                logger.debug("Exception while receiving from %s @ %d", self._tcp_client.addr()[0],
-                             self._tcp_client.addr()[1], exc_info=e)
+                logger.debug("Exception while receiving from %s @ %d", self._tcp_client.addr[0],
+                             self._tcp_client.addr[1], exc_info=e)
                 self.stop()
                 self._msg_q.put(Message(0, None, self._client_id))
                 return
             except OSError as e:
-                logger.debug("Exception while receiving from %s @ %d", self._tcp_client.addr()[0],
-                             self._tcp_client.addr()[1], exc_info=e)
+                logger.debug("Exception while receiving from %s @ %d", self._tcp_client.addr[0],
+                             self._tcp_client.addr[1], exc_info=e)
                 self.stop()
                 self._msg_q.put(Message(0, None, self._client_id))
                 return
