@@ -306,7 +306,7 @@ class TCPServer:
         if not self._create_soc():
             return False
         self._is_running = True
-        threading.Thread(target=self._mainloop).start()
+        threading.Thread(target=self._mainloop, daemon=True).start()
         logger.info("Server has been started")
         return True
 
