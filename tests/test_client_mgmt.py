@@ -26,7 +26,7 @@ class TestClientMgmt:
                          os.path.join(log_folder, "test_server_limits.log"),
                          logging.DEBUG,
                          "test-server-limits-filehandler")
-        server.set_max_clients(10)
+        server.max_clients = 10
         last_client = client_list.pop()
 
         server.start()
@@ -36,8 +36,8 @@ class TestClientMgmt:
             c.connect()
         time.sleep(0.1)
 
-        assert server.client_count() == 10
+        assert server.client_count == 10
 
         last_client.connect()
         time.sleep(0.1)
-        assert not last_client.is_connected()
+        assert not last_client.is_connected

@@ -17,44 +17,66 @@ class TestLibState:
                          logging.DEBUG,
                          "test_server_state-filehandler")
 
-        assert server.addr() == (HOST, PORT)
-        assert not server.is_running()
-        assert not server.is_full()
-        assert server.max_clients() == 0
-        assert server.server_timeout() is None
+        assert server.addr == (HOST, PORT)
+        assert not server.is_running
+        assert not server.is_full
+        assert server.max_clients == 0
+        assert server.timeout is None
 
-        server.set_addr("123.456.789", 9000)
-        assert server.addr() == ("123.456.789", 9000)
-        server.set_addr(HOST, PORT)
-        assert server.addr() == (HOST, PORT)
+        server.addr = ("123.456.789", 9000)
+        assert server.addr == ("123.456.789", 9000)
+        server.addr = (HOST, PORT)
+        assert server.addr == (HOST, PORT)
 
         server.start()
         time.sleep(0.1)
 
-        server.set_addr("123.456.789", 9000)
-        assert server.addr() == (HOST, PORT)
-        assert server.is_running()
-        assert not server.is_full()
-        assert server.max_clients() == 0
-        assert server.server_timeout() is None
+        assert server.is_running
+        assert not server.is_full
+        assert server.max_clients == 0
+        assert server.timeout is None
 
-        assert server.set_server_timeout(10)
-        assert server.server_timeout() == 10
-        assert not server.set_server_timeout(-1)
-        assert not server.set_server_timeout(-25)
-        assert server.server_timeout() == 10
-        assert server.set_server_timeout(None)
+        server.timeout = 10
+        assert server.timeout == 10
+        try:
+            server.timeout = -1
+        except Exception as e:
+            if isinstance(e, ValueError):
+                assert True
+            else:
+                assert False
+        try:
+            server.timeout = -25
+        except Exception as e:
+            if isinstance(e, ValueError):
+                assert True
+            else:
+                assert False
+        assert server.timeout == 10
+        server.timeout = None
 
-        assert server.set_max_clients(1)
-        assert server.max_clients() == 1
-        assert not server.set_max_clients(-1)
-        assert not server.set_max_clients(-25)
-        assert server.max_clients() == 1
+        server.max_clients = 1
+        assert server.max_clients == 1
+        try:
+            server.max_clients = -1
+        except Exception as e:
+            if isinstance(e, ValueError):
+                assert True
+            else:
+                assert False
+        try:
+            server.max_clients = -25
+        except Exception as e:
+            if isinstance(e, ValueError):
+                assert True
+            else:
+                assert False
+        server.max_clients = 1
 
         dummy_client.connect((HOST, PORT))
         time.sleep(0.1)
-        assert server.client_count() == 1
-        assert server.is_full() is True
+        assert server.client_count == 1
+        assert server.is_full is True
 
         assert server.list_clients()
         conn_client = server.list_clients()[0]
@@ -76,40 +98,40 @@ class TestLibState:
 
         server.disconnect_client(conn_client)
 
-        assert server.is_full() is False
-        assert server.client_count() == 0
+        assert server.is_full is False
+        assert server.client_count == 0
 
         server.stop()
 
-        assert server.addr() == (HOST, PORT)
-        assert not server.is_running()
-        assert not server.is_full()
-        assert server.max_clients() == 1
+        assert server.addr == (HOST, PORT)
+        assert not server.is_running
+        assert not server.is_full
+        assert server.max_clients == 1
 
     def test_client_state(self, dummy_server, client):
         add_file_handler(logger,
                          os.path.join(log_folder, "test_passive_client_state.log"),
                          logging.DEBUG,
                          "test_passive_client_state-filehandler")
-        assert client.timeout() is None
-        assert client.is_connected() is False
+        assert client.timeout is None
+        assert client.is_connected is False
 
-        client.set_timeout(10)
-        assert client.timeout() == 10
+        client.timeout = 10
+        assert client.timeout == 10
 
-        client.set_addr("123.456.789", 9000)
-        assert client.addr() == ("123.456.789", 9000)
-        client.set_addr(HOST, PORT)
-        assert client.addr() == (HOST, PORT)
+        client.addr = ("123.456.789", 9000)
+        assert client.addr == ("123.456.789", 9000)
+        client.addr = (HOST, PORT)
+        assert client.addr == (HOST, PORT)
 
         assert client.connect() is True
         time.sleep(0.1)
 
-        assert client.is_connected() is True
-        client.set_addr(HOST, PORT)
-        assert client.addr() == (HOST, PORT)
+        assert client.is_connected is True
+        client.addr = (HOST, PORT)
+        assert client.addr == (HOST, PORT)
 
         client.disconnect()
 
-        assert client.addr() == (HOST, PORT)
-        assert client.is_connected() is False
+        assert client.addr == (HOST, PORT)
+        assert client.is_connected is False

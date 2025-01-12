@@ -49,47 +49,55 @@ class TCPClient:
             self._soc = None
         self._is_connected = False
 
+    @property
     def is_connected(self) -> bool:
         """
         Returns a boolean flag indicating whether the client is connected
         """
         return self._is_connected
 
+    @is_connected.setter
+    def is_connected(self, value):
+        return
+
+    @property
     def timeout(self) -> int | None:
         """
         Returns an integer representing the current timeout value.
         """
         return self._timeout
 
-    def set_timeout(self, timeout: int) -> bool:
+    @timeout.setter
+    def timeout(self, timeout: int):
         """
         Sets how long the client will wait for messages from the server (in seconds). The Timeout argument should be
         a positive integer. Setting to zero will cause network operations to fail if no data is received immediately.
-        Passing 'None' will set the timeout to infinity. Returns True on success, False if not. See
+        Passing 'None' will set the timeout to infinity.
         https://docs.python.org/3/library/socket.html#socket-timeouts for more information about timeouts.
         """
         if timeout is not None:
             if timeout < 0:
-                return False
+                raise ValueError("Value for timeout should be a positive integer")
         self._timeout = timeout
         if self._soc:
             self._soc.settimeout(self._timeout)
-            return True
 
-    def set_addr(self, host: str, port: int):
+    @property
+    def addr(self) -> tuple[str, int]:
+        """
+        Returns a tuple with the host's ip (str) and the port (int)
+        """
+        return self._addr
+
+    @addr.setter
+    def addr(self, value: tuple[str, int]):
         """
         Allows for the address to be changed after class creation. If the server is running, this function will do
         nothing.
         """
         if self._is_connected:
             return
-        self._addr = (host, port)
-
-    def addr(self) -> tuple[str, int]:
-        """
-        Returns a tuple with the host's ip (str) and the port (int)
-        """
-        return self._addr
+        self._addr = value
 
     def connect(self) -> bool:
         """

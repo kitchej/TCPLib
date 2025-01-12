@@ -23,30 +23,30 @@ class ClientProcessor:
                  buff_size=4096, timeout: int = None):
         self._client_id = client_id
         self._tcp_client = TCPClient.from_socket(client_soc)
-        self._tcp_client.set_timeout(timeout)
+        self._tcp_client.timeout = timeout
         self._msg_q = msg_q
         self._server_obj = server_obj
         self._buff_size = buff_size
         self._is_running = True
         th = threading.Thread(target=self._receive_loop)
         th.start()
-        logger.info(f"Processing %s @ %d as client #%s", self.addr()[0], self.addr()[1], self._client_id)
+        logger.info(f"Processing %s @ %d as client #%s", self.addr[0], self.addr[1], self._client_id)
 
     def _receive_loop(self):
         logger.debug("Client %s is listening for new messages from %s @ %d",
-                     self._client_id, self.addr()[0], self.addr()[1])
+                     self._client_id, self.addr[0], self.addr[1])
         while self._is_running:
             try:
                 msg = self._tcp_client.receive_all(self._buff_size)
             except ConnectionError as e:
-                logger.debug("Exception while receiving from %s @ %d", self._tcp_client.addr()[0],
-                             self._tcp_client.addr()[1], exc_info=e)
+                logger.debug("Exception while receiving from %s @ %d", self._tcp_client.addr[0],
+                             self._tcp_client.addr[1], exc_info=e)
                 self.stop()
                 self._msg_q.put(Message(0, None, self._client_id))
                 return
             except OSError as e:
-                logger.debug("Exception while receiving from %s @ %d", self._tcp_client.addr()[0],
-                             self._tcp_client.addr()[1], exc_info=e)
+                logger.debug("Exception while receiving from %s @ %d", self._tcp_client.addr[0],
+                             self._tcp_client.addr[1], exc_info=e)
                 self.stop()
                 self._msg_q.put(Message(0, None, self._client_id))
                 return
@@ -56,26 +56,59 @@ class ClientProcessor:
                 continue
             self._msg_q.put(msg)
 
+    @property
     def id(self) -> str:
         """
         Returns a string indicating the id of the client.
         """
         return self._client_id
 
+    @id.setter
+    def id(self, value):
+        return
+
+    @property
     def timeout(self) -> int:
         """
         Returns an int representing the current timeout value.
         """
-        return self._tcp_client.timeout()
+        return self._tcp_client.timeout
 
-    def set_timeout(self, timeout: int) -> bool:
+    @timeout.setter
+    def timeout(self, timeout: int):
         """
         Sets how long the client will wait for messages from the server (in seconds). The Timeout argument should be
         a positive integer. Setting to zero will cause network operations to fail if no data is received immediately.
         Passing 'None' will set the timeout to infinity. Returns True on success, False if not. See
         https://docs.python.org/3/library/socket.html#socket-timeouts for more information about timeouts.
         """
-        return self._tcp_client.set_timeout(timeout)
+        self._tcp_client.timeout = timeout
+
+    @property
+    def addr(self) -> tuple[str, int]:
+        """
+        Returns a tuple with the host's ip (str) and the port (int)
+        """
+        return self._tcp_client.addr
+
+    @addr.setter
+    def addr(self, value: tuple[str, int]):
+        """
+        Allows for the address to be changed after class creation. If the server is running, this function will do
+        nothing.
+        """
+        self._tcp_client.addr = value
+
+    @property
+    def is_running(self):
+        """
+        Returns a boolean indicating whether the client processor is set up and running
+        """
+        return self._is_running
+
+    @is_running.setter
+    def is_running(self, value):
+        return
 
     def send(self, data: bytes) -> bool:
         """
@@ -83,25 +116,6 @@ class ClientProcessor:
         False on failed transmission. Raises TimeoutError, ConnectionError, socket.gaierror, and OSError.
         """
         return self._tcp_client.send(data)
-
-    def addr(self) -> tuple[str, int]:
-        """
-        Returns a tuple with the host's ip (str) and the port (int)
-        """
-        return self._tcp_client.addr()
-
-    def set_addr(self, host: str, port: int):
-        """
-        Allows for the address to be changed after class creation. If the server is running, this function will do
-        nothing.
-        """
-        self._tcp_client.set_addr(host, port)
-
-    def is_running(self):
-        """
-        Returns a boolean indicating whether the client processor is set up and running
-        """
-        return self._is_running
 
     def stop(self):
         """
