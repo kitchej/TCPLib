@@ -2,6 +2,8 @@
 test_client_mgmt.py
 Written by: Joshua Kitchen - 2024
 """
+import threading
+
 import pytest
 import time
 import logging
@@ -41,3 +43,17 @@ class TestClientMgmt:
         last_client.connect()
         time.sleep(0.1)
         assert not last_client.is_connected
+
+    def test_client_to_client_timeout(self, client):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_client_to_client_timeout.log"),
+                         logging.DEBUG,
+                         "test_client_to_client_timeout-filehandler")
+
+        try:
+            client.single_client_connect(0.1)
+        except TimeoutError:
+            assert True
+            return
+        assert False
+

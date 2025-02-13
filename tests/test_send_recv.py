@@ -30,7 +30,7 @@ class TestSendRecv:
         time.sleep(0.1)
         server_copy = server.pop_msg(block=True)
         server.send(server_copy.client_id, server_copy.data)
-        client_copy = client.receive_all()
+        client_copy = client.receive()
         return server_copy, client_copy
 
     def test_send_file(self, server, client):
@@ -52,8 +52,8 @@ class TestSendRecv:
         assert server_msg.data == video
         assert server_msg.client_id == server_client_id
 
-        assert client_msg.size == len(video)
-        assert client_msg.data == video
+        assert len(client_msg) == len(video)
+        assert client_msg == video
 
     @pytest.mark.parametrize('client_list', [20], indirect=True)
     def test_send_file_multi_client(self, client_list, server):
@@ -84,3 +84,35 @@ class TestSendRecv:
 
         for msg in server.get_all_msg():
             assert msg.data == photo
+
+    @pytest.mark.parametrize('client_list', [2], indirect=True)
+    def test_client_to_client_recv(self, client_list):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_client_to_client_recv.log"),
+                         logging.DEBUG,
+                         "test_client_to_client_recv-filehandler")
+
+        with open(os.path.abspath(os.path.join("dummy_files", "video1.mkv")), 'rb') as file:
+            video = file.read()
+
+        client1 = client_list[0]
+        client2 = client_list[1]
+
+        threading.Thread(target=client1.single_client_connect).start()
+        time.sleep(0.1)
+        client2.connect()
+        time.sleep(0.1)
+
+        client1.send(b'Hello World')
+        client2_cpy = client2.receive()
+        client2.send(client2_cpy)
+        client1_cpy = client1.receive()
+
+        assert client1_cpy == client2_cpy
+
+        client1.send(video)
+        client2_cpy = client2.receive()
+        client2.send(client2_cpy)
+        client1_cpy = client1.receive()
+
+        assert client1_cpy == client2_cpy

@@ -19,13 +19,11 @@ class ClientProcessor:
     Maintains a single client connection for the server.
     """
 
-    def __init__(self, client_id, client_soc: socket.socket, msg_q: queue.Queue, server_obj,
-                 buff_size=4096, timeout: int = None):
+    def __init__(self, client_id, client_soc: socket.socket, msg_q: queue.Queue, buff_size=4096, timeout: int = None):
         self._client_id = client_id
         self._tcp_client = TCPClient.from_socket(client_soc)
         self._tcp_client.timeout = timeout
         self._msg_q = msg_q
-        self._server_obj = server_obj
         self._buff_size = buff_size
         self._is_running = True
         th = threading.Thread(target=self._receive_loop)
@@ -35,26 +33,19 @@ class ClientProcessor:
     def _receive_loop(self):
         logger.debug("Client %s is listening for new messages from %s @ %d",
                      self._client_id, self.addr[0], self.addr[1])
+        data = bytearray()
         while self._is_running:
             try:
-                msg = self._tcp_client.receive_all(self._buff_size)
-            except ConnectionError as e:
+                data = self._tcp_client.receive(self._buff_size)
+            except Exception as e:
                 logger.debug("Exception while receiving from %s @ %d", self._tcp_client.addr[0],
                              self._tcp_client.addr[1], exc_info=e)
                 self.stop()
-                self._msg_q.put(Message(0, None, self._client_id))
+                self._msg_q.put(Message(len(data), data, self._client_id))
                 return
-            except OSError as e:
-                logger.debug("Exception while receiving from %s @ %d", self._tcp_client.addr[0],
-                             self._tcp_client.addr[1], exc_info=e)
-                self.stop()
-                self._msg_q.put(Message(0, None, self._client_id))
-                return
-
-            msg.client_id = self._client_id
-            if msg.data is None:
+            if len(data) == 0:
                 continue
-            self._msg_q.put(msg)
+            self._msg_q.put(Message(len(data), data, self._client_id))
 
     @property
     def id(self) -> str:

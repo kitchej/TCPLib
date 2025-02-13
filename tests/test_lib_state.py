@@ -1,9 +1,12 @@
+import threading
 import time
 import logging
 import os
+import pytest
 
 from tests.globals_for_tests import setup_log_folder, HOST, PORT
 from src.log_util import add_file_handler
+from src.TCPLib.tcp_client import NoAddressSupplied
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -74,7 +77,7 @@ class TestLibState:
         server.max_clients = 1
 
         dummy_client.connect((HOST, PORT))
-        time.sleep(0.1)
+        time.sleep(0.2)
         assert server.client_count == 1
         assert server.is_full is True
 
@@ -110,9 +113,9 @@ class TestLibState:
 
     def test_client_state(self, dummy_server, client):
         add_file_handler(logger,
-                         os.path.join(log_folder, "test_passive_client_state.log"),
+                         os.path.join(log_folder, "test_client_state.log"),
                          logging.DEBUG,
-                         "test_passive_client_state-filehandler")
+                         "test_client_state-filehandler")
         assert client.timeout is None
         assert client.is_connected is False
 
@@ -121,17 +124,53 @@ class TestLibState:
 
         client.addr = ("123.456.789", 9000)
         assert client.addr == ("123.456.789", 9000)
+        client.addr = (None, None)
+        try:
+            client.connect()
+        except NoAddressSupplied:
+            assert True
         client.addr = (HOST, PORT)
         assert client.addr == (HOST, PORT)
-
-        assert client.connect() is True
+        client.connect()
         time.sleep(0.1)
-
         assert client.is_connected is True
-        client.addr = (HOST, PORT)
+        client.addr = ("123.456.789", 9000)
         assert client.addr == (HOST, PORT)
 
         client.disconnect()
 
         assert client.addr == (HOST, PORT)
         assert client.is_connected is False
+
+    @pytest.mark.parametrize('client_list', [2], indirect=True)
+    def test_client_to_client_state(self, client_list):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_client_to_client_state.log"),
+                         logging.DEBUG,
+                         "test_client_to_client_state-filehandler")
+
+        client1 = client_list[0]
+        client2 = client_list[1]
+
+        client1.addr = (None, None)
+        try:
+            client1.single_client_connect()
+        except NoAddressSupplied:
+            assert True
+        client1.addr = (HOST, PORT)
+
+
+        threading.Thread(target=client1.single_client_connect).start()
+        time.sleep(0.1)
+        client2.connect()
+        time.sleep(0.1)
+
+        assert client1.is_connected is True
+        assert client2.is_connected is True
+        assert client1.addr == (HOST, PORT)
+        assert client2.addr == (HOST, PORT)
+        assert client1.single_client_connect() is False
+        assert client2.single_client_connect() is False
+
+
+

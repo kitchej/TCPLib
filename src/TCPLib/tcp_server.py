@@ -99,7 +99,6 @@ class TCPServer:
         client_proc = ClientProcessor(client_id=client_id,
                                       client_soc=client_soc,
                                       msg_q=self._messages,
-                                      server_obj=self,
                                       timeout=self._timeout)
         self._update_connected_clients(client_proc.id, client_proc)
 
