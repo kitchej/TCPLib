@@ -51,7 +51,7 @@ class TestClientMgmt:
                          "test_client_to_client_timeout-filehandler")
 
         try:
-            client.single_client_connect(0.1)
+            client.host_single_client(0.1)
         except TimeoutError:
             assert True
             return

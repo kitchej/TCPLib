@@ -18,8 +18,7 @@ logger = logging.getLogger(__name__)
 
 class TCPServer:
     """
-    Class for creating, maintaining, and transmitting data to multiple client connections. This class can
-    accept and use an external Queue object
+    Creates, maintains, and transmits data to multiple TCPLib.TCPClient connections.
     """
 
     def __init__(self, host: str = None, port: int = None, max_clients: int = 0, timeout: int = None,
@@ -81,6 +80,8 @@ class TCPServer:
                 client_soc.sendall(encode_msg(b'CONNECTION ACCEPTED'))
                 self._start_client_proc(self._generate_client_id(), client_soc)
             except OSError:
+                if self._soc is None:
+                    break
                 logger.exception(f"Exception occurred while listening on %s @ %d", self._addr[0], self._addr[1])
                 break
 
@@ -112,7 +113,7 @@ class TCPServer:
     @addr.setter
     def addr(self, value: tuple[str, int]):
         """
-        Allows for the address to be changed after class creation. If the server is running, this function will do
+        Allows for the address to be changed after class creation. If the server is running, this function does
         nothing.
         """
         if self._is_running:
@@ -215,7 +216,7 @@ class TCPServer:
 
     def list_clients(self) -> list:
         """
-        Returns a list of with the client ids of all connected clients
+        Returns a list with the client ids of all connected clients
         """
         self._connected_clients_lock.acquire()
         client_list = self._connected_clients.keys()
@@ -268,7 +269,7 @@ class TCPServer:
 
     def get_all_msg(self, block: bool = False, timeout: int = None) -> Generator[Message | None, None, None]:
         """
-        Generator for iterating over the queue. If block is True, each iteration of this method will block until it
+        Generator for iterating over the message queue. If block is True, each iteration of this method will block until it
         can pop something from the queue, else it will try to get a value and yield None if queue is empty. If block
         is True and a timeout is given, block until timeout expires and then yield None if no item was received. See
         https://docs.python.org/3/library/queue.html#queue.Queue.get for more information
@@ -282,10 +283,10 @@ class TCPServer:
         """
         return not self._messages.empty()
 
-    def send(self, client_id: str, data: bytes) -> bool:
+    def send_bytes(self, client_id: str, data: bytes) -> bool:
         """
-        Sends data to a connected client. Data should be a bytes-like object. Returns True on successful sending,
-        False if not or if a client with client_id could not be found.
+        Sends data to a connected client. Returns True on successful sending, False if not or if a client with
+        client_id could not be found.
         """
         self._connected_clients_lock.acquire()
         try:
@@ -295,6 +296,10 @@ class TCPServer:
             return False
         self._connected_clients_lock.release()
         return client.send(data)
+
+    def send(self, client_id: str, msg: str, encoding: str="utf-8") -> bool:
+        data = bytes(msg, encoding=encoding)
+        return self.send_bytes(client_id, data)
 
     def start(self) -> bool:
         """

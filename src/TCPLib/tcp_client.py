@@ -21,7 +21,7 @@ class NegativeBufferValue(Exception):
 
 class TCPClient:
     """
-    A basic TCP client.
+    A simple TCP client for connecting to a TCPLib.Server object or another TCPLib.TCPClient object
     """
 
     def __init__(self, host: str = None, port: int = None, timeout: int = None):
@@ -52,37 +52,9 @@ class TCPClient:
             self._listen_soc = None
         self._is_connected = False
 
-    def _send_bytes(self, data: bytes):
-        """
-        Send all bytes of the data argument WITHOUT a header attached. Returns True on successful transmission,
-        False on failed transmission. Raises TimeoutError, ConnectionError, socket.gaierror, and OSError.
-        """
-        if not self._is_connected:
-            return False
-        try:
-            self._soc.sendall(data)
-            return True
-        except AttributeError:  # Socket was closed from another thread
-            self._clean_up()
-            return False
-        except TimeoutError as e:
-            self._clean_up()
-            raise e
-        except ConnectionError as e:
-            self._clean_up()
-            raise e
-        except socket.gaierror as e:
-            self._clean_up()
-            raise e
-        except OSError as e:
-            self._clean_up()
-            raise e
-
-    def _receive_bytes(self, size: int) -> bytes | None:
-        """
-        Receive only the number of bytes specified, None if connection was closed prematurely. Raises TimeoutError,
-        ConnectionError, socket.gaierror, and OSError.
-        """
+    def _receive_chunk(self, size: int) -> bytes | None:
+        # Receive only the number of bytes specified, None if connection was closed prematurely. Raises TimeoutError,
+        # ConnectionError, socket.gaierror, and OSError.
         try:
             data = self._soc.recv(size)
             return data
@@ -145,16 +117,16 @@ class TCPClient:
     @addr.setter
     def addr(self, value: tuple[str, int]):
         """
-        Allows for the address to be changed after class creation. If the server is running, this function will do
+        Allows for the address to be changed after class creation. If the client is connected, this function will do
         nothing.
         """
         if self._is_connected:
             return
         self._addr = value
 
-    def single_client_connect(self, timeout: int=None) -> bool:
+    def host_single_client(self, timeout: int=None) -> bool:
         """
-        Listens for an incoming connection from another TCPClient object. The timeout argument sets how long this
+        Hosts a single connection from another TCPClient object. The timeout argument sets how long this
         method will listen for a connection. Raises TimeoutError, ConnectionError, and socket.gaierror.
         """
         if self._addr == (None, None) or self._addr is None:
@@ -186,13 +158,10 @@ class TCPClient:
             raise e
         return True
 
-
-
     def connect(self) -> bool:
         """
-        Initiates a connection to the server. Raises TimeoutError, ConnectionError, and socket.gaierror.
-        Returns False if server object refused the connection and True if the connection was
-        accepted.
+        Initiates a connection to a TCPLib server object. Raises TimeoutError, ConnectionError, and socket.gaierror.
+        Returns False if the server object refused connection and True if connection was accepted.
         """
         if self._addr == (None, None):
             raise NoAddressSupplied("TCPClient was not given an address to connect to. Either pass it to __init__() or "
@@ -236,19 +205,46 @@ class TCPClient:
 
     def disconnect(self):
         """
-        Disconnect from the currently connected server. If no connection is opened, this method does nothing.
+        Disconnect from the currently connected host. If no connection is opened, this method does nothing.
         """
         if self._is_connected:
             self._clean_up()
             logger.info("Disconnected from %s @ %d", self._addr[0], self._addr[1])
 
+    def send_bytes(self, data: bytes):
+        """
+        Send raw bytes to the host. Attaches a 4 bytes size header before sending. Returns True on successful
+        transmission, False on failed transmission. Raises TimeoutError, ConnectionError, socket.gaierror, and OSError.
+        """
+        if not self._is_connected:
+            return False
+        try:
+            self._soc.sendall(encode_msg(data))
+            return True
+        except AttributeError:  # Socket was closed from another thread
+            self._clean_up()
+            return False
+        except TimeoutError as e:
+            self._clean_up()
+            raise e
+        except ConnectionError as e:
+            self._clean_up()
+            raise e
+        except socket.gaierror as e:
+            self._clean_up()
+            raise e
+        except OSError as e:
+            self._clean_up()
+            raise e
 
-    def send(self, data: bytes) -> bool:
+    def send(self, msg: str, encoding: str='utf-8') -> bool:
         """
-        Send all bytes of the data argument. Attaches a 4 bytes size header before sending. Returns True on successful transmission,
-        False on failed transmission. Raises TimeoutError, ConnectionError, socket.gaierror, and OSError.
+        Send a message to the host as a string. If no encoding is given, utf-8 is assumed. Attaches a 4 bytes size header
+        before sending. Returns True on successful transmission, False on failed transmission. Raises TimeoutError,
+        ConnectionError, socket.gaierror, and OSError.
         """
-        return self._send_bytes(encode_msg(data))
+        data = bytes(msg, encoding=encoding)
+        return self.send_bytes(data)
 
     def iter_receive(self, buff_size: int = 4096) -> Generator[bytes | int, None, None]:
         """
@@ -261,7 +257,7 @@ class TCPClient:
         if buff_size <= 0:
             raise NegativeBufferValue("Argument buff_size must be a non-zero, positive integer")
         bytes_recv = 0
-        header = self._receive_bytes(4)
+        header = self._receive_chunk(4)
         if not header:  # Socket was closed from another thread
             return
         size = decode_header(header)
@@ -271,7 +267,7 @@ class TCPClient:
         if size < buff_size:
             buff_size = size
         while bytes_recv < size:
-            data = self._receive_bytes(buff_size)
+            data = self._receive_chunk(buff_size)
             if not data:  # Socket was closed from another thread
                 return
             bytes_recv += len(data)
@@ -280,9 +276,9 @@ class TCPClient:
                 buff_size = remaining
             yield data
 
-    def receive(self, buff_size: int = 4096) -> bytearray:
+    def receive_bytes(self, buff_size: int = 4096) -> bytearray:
         """
-        Receive all the bytes of an incoming message and returns a bytearray. Raises TimeoutError, ConnectionError,
+        Receive raw bytes from the host. Returns a bytearray. Raises TimeoutError, ConnectionError,
         socket.gaierror, and OSError.
         """
         data = bytearray()
@@ -301,3 +297,10 @@ class TCPClient:
             data.extend(chunk)
         logger.debug("Received a total of %d bytes from %s @ %d", len(data), self._addr[0], self._addr[1])
         return data
+
+    def receive(self, encoding: str="utf-8") -> str:
+        """
+        Receive a message from the host as a string. If no encoding is given, utf-8 is assumed. Raises TimeoutError,
+        ConnectionError, socket.gaierror, and OSError.
+        """
+        return str(self.receive_bytes(), encoding=encoding)

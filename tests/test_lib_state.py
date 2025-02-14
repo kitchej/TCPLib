@@ -154,13 +154,13 @@ class TestLibState:
 
         client1.addr = (None, None)
         try:
-            client1.single_client_connect()
+            client1.host_single_client()
         except NoAddressSupplied:
             assert True
         client1.addr = (HOST, PORT)
 
 
-        threading.Thread(target=client1.single_client_connect).start()
+        threading.Thread(target=client1.host_single_client).start()
         time.sleep(0.1)
         client2.connect()
         time.sleep(0.1)
@@ -169,8 +169,8 @@ class TestLibState:
         assert client2.is_connected is True
         assert client1.addr == (HOST, PORT)
         assert client2.addr == (HOST, PORT)
-        assert client1.single_client_connect() is False
-        assert client2.single_client_connect() is False
+        assert client1.host_single_client() is False
+        assert client2.host_single_client() is False
 
 
 

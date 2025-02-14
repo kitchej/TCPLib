@@ -21,17 +21,46 @@ log_folder = setup_log_folder("TestSendRecv")
 class TestSendRecv:
     @staticmethod
     def send(client, thread_id, data, completed_q):
-        client.send(data)
+        client.send_bytes(data)
         completed_q.put(f"{thread_id} SENT")
 
     @staticmethod
-    def echo(client, server, data):
-        client.send(data)
+    def echo(client, server, data, is_str=False):
+        if is_str:
+            client.send(data)
+        else:
+            client.send_bytes(data)
         time.sleep(0.1)
         server_copy = server.pop_msg(block=True)
-        server.send(server_copy.client_id, server_copy.data)
-        client_copy = client.receive()
+        if is_str:
+            server.send(server_copy.client_id, str(server_copy.data, encoding="utf-8"))
+            client_copy = client.receive()
+        else:
+            server.send_bytes(server_copy.client_id, server_copy.data)
+            client_copy = client.receive_bytes()
         return server_copy, client_copy
+
+
+    def test_send_str(self, server, client):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_send_str.log"),
+                         logging.DEBUG,
+                         "test_send_str-filehandler")
+        message = "Hello World!"
+        server.start()
+        time.sleep(0.1)
+        client.connect()
+        time.sleep(0.1)
+        server_client_id = server.list_clients()[0]
+        server_msg, client_msg = self.echo(client, server, message, is_str=True)
+
+        assert server_msg.size == len(message)
+        assert server_msg.data == bytes(message, encoding="utf-8")
+        assert server_msg.client_id == server_client_id
+
+        assert len(client_msg) == len(message)
+        assert client_msg == message
+
 
     def test_send_file(self, server, client):
         add_file_handler(logger,
@@ -86,11 +115,11 @@ class TestSendRecv:
             assert msg.data == photo
 
     @pytest.mark.parametrize('client_list', [2], indirect=True)
-    def test_client_to_client_recv(self, client_list):
+    def test_client_to_client_send_recv(self, client_list):
         add_file_handler(logger,
-                         os.path.join(log_folder, "test_client_to_client_recv.log"),
+                         os.path.join(log_folder, "test_client_to_client_send_recv.log"),
                          logging.DEBUG,
-                         "test_client_to_client_recv-filehandler")
+                         "test_client_to_client_send_recv-filehandler")
 
         with open(os.path.abspath(os.path.join("dummy_files", "video1.mkv")), 'rb') as file:
             video = file.read()
@@ -98,21 +127,21 @@ class TestSendRecv:
         client1 = client_list[0]
         client2 = client_list[1]
 
-        threading.Thread(target=client1.single_client_connect).start()
+        threading.Thread(target=client1.host_single_client).start()
         time.sleep(0.1)
         client2.connect()
         time.sleep(0.1)
 
-        client1.send(b'Hello World')
+        client1.send('Hello World')
         client2_cpy = client2.receive()
         client2.send(client2_cpy)
         client1_cpy = client1.receive()
 
         assert client1_cpy == client2_cpy
 
-        client1.send(video)
-        client2_cpy = client2.receive()
-        client2.send(client2_cpy)
-        client1_cpy = client1.receive()
+        client1.send_bytes(video)
+        client2_cpy = client2.receive_bytes()
+        client2.send_bytes(client2_cpy)
+        client1_cpy = client1.receive_bytes()
 
         assert client1_cpy == client2_cpy

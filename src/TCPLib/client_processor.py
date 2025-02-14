@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 class ClientProcessor:
     """
-    Maintains a single client connection for the server.
+    Maintains a single client connection for a TCPLib.Server object.
     """
 
     def __init__(self, client_id, client_soc: socket.socket, msg_q: queue.Queue, buff_size=4096, timeout: int = None):
@@ -36,7 +36,7 @@ class ClientProcessor:
         data = bytearray()
         while self._is_running:
             try:
-                data = self._tcp_client.receive(self._buff_size)
+                data = self._tcp_client.receive_bytes(self._buff_size)
             except Exception as e:
                 logger.debug("Exception while receiving from %s @ %d", self._tcp_client.addr[0],
                              self._tcp_client.addr[1], exc_info=e)
@@ -103,14 +103,14 @@ class ClientProcessor:
 
     def send(self, data: bytes) -> bool:
         """
-        Send all bytes of the data argument with a header attached. Returns True on successful transmission,
+        Send bytes to the client with a 4 byte header attached. Returns True on successful transmission,
         False on failed transmission. Raises TimeoutError, ConnectionError, socket.gaierror, and OSError.
         """
-        return self._tcp_client.send(data)
+        return self._tcp_client.send_bytes(data)
 
     def stop(self):
         """
-        Stops the client processor. If the client is not running, this method will do nothing.
+        Stops the client processor. If the client is not running, this method does nothing.
         """
         if self._is_running:
             self._is_running = False
