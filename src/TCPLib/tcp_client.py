@@ -11,10 +11,6 @@ from .utils import encode_msg, decode_header
 logger = logging.getLogger(__name__)
 
 
-class NoAddressSupplied(Exception):
-    pass
-
-
 class NegativeBufferValue(Exception):
     pass
 
@@ -24,10 +20,11 @@ class TCPClient:
     A simple TCP client for connecting to a TCPLib.Server object or another TCPLib.TCPClient object
     """
 
-    def __init__(self, host: str = None, port: int = None, timeout: int = None):
+    def __init__(self, timeout: int = None):
         self._soc = None
         self._listen_soc = None
-        self._addr = (host, port)
+        self._remote_addr = (None, None)
+        self._host_addr = (None, None)
         self._timeout = timeout
         self._is_connected = False
 
@@ -39,7 +36,7 @@ class TCPClient:
         """
         out = cls(None, None, soc.gettimeout())
         out._soc = soc
-        out._addr = soc.getpeername()
+        out._host_addr = soc.getpeername()
         out._is_connected = True
         return out
 
@@ -50,6 +47,8 @@ class TCPClient:
         if self._listen_soc is not None:
             self._listen_soc.close()
             self._listen_soc = None
+        self._remote_addr = (None, None)
+        self._host_addr = (None, None)
         self._is_connected = False
 
     def _receive_chunk(self, size: int) -> bytes | None:
@@ -108,41 +107,43 @@ class TCPClient:
             self._soc.settimeout(self._timeout)
 
     @property
-    def addr(self) -> tuple[str, int]:
+    def host_addr(self) -> tuple[str, int]:
         """
-        Returns a tuple with the host's ip (str) and the port (int)
+        Returns a tuple with the host's address
         """
-        return self._addr
+        return self._host_addr
 
-    @addr.setter
-    def addr(self, value: tuple[str, int]):
-        """
-        Allows for the address to be changed after class creation. If the client is connected, this function will do
-        nothing.
-        """
-        if self._is_connected:
-            return
-        self._addr = value
+    @host_addr.setter
+    def host_addr(self, value) -> tuple[str, int]:
+        return
 
-    def host_single_client(self, timeout: int=None) -> bool:
+    @property
+    def remote_addr(self) -> tuple[str, int]:
+        """
+        Returns a tuple with the remote client's address
+        """
+        return self._remote_addr
+
+    @remote_addr.setter
+    def remote_addr(self, value) -> tuple[str, int]:
+        return
+
+    def host_single_client(self, addr: tuple[int, str], timeout: int = None):
         """
         Hosts a single connection from another TCPClient object. The timeout argument sets how long this
         method will listen for a connection. Raises TimeoutError, ConnectionError, and socket.gaierror.
         """
-        if self._addr == (None, None) or self._addr is None:
-            raise NoAddressSupplied("TCPClient was not given an address to connect to. Either pass it to __init__() or "
-                                    "call set_addr()")
         if self._is_connected:
-            return False
+            return
         self._listen_soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._listen_soc.settimeout(timeout)
-        self._listen_soc.bind(self.addr)
+        self._listen_soc.bind(addr)
         try:
             self._listen_soc.listen()
             client_soc, client_addr = self._listen_soc.accept()
             self._soc = client_soc
+            self._remote_addr = client_addr
             self._is_connected = True
-            self._soc.sendall(encode_msg(b'CONNECTION ACCEPTED'))
             logger.info("Accepted Connection from %s @ %d", client_addr[0], client_addr[1])
         except TimeoutError as e:
             self._clean_up()
@@ -156,26 +157,24 @@ class TCPClient:
         except OSError as e:
             self._clean_up()
             raise e
-        return True
+        self._listen_soc.close()
+        self._listen_soc = None
+        return
 
-    def connect(self) -> bool:
+    def connect(self, addr: tuple[int, str]) -> bool:
         """
         Initiates a connection to a TCPLib server object. Raises TimeoutError, ConnectionError, and socket.gaierror.
         Returns False if the server object refused connection and True if connection was accepted.
         """
-        if self._addr == (None, None):
-            raise NoAddressSupplied("TCPClient was not given an address to connect to. Either pass it to __init__() or "
-                                    "call set_addr()")
         if self._is_connected:
             return False
         self._soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._soc.settimeout(self._timeout)
-
-        logger.info("Attempting to connect to %s @ %d", self._addr[0], self._addr[1])
+        self._host_addr = addr
+        logger.info("Attempting to connect to %s @ %d", self._host_addr[0], self._host_addr[1])
         try:
-            self._soc.connect(self._addr)
-            size = decode_header(self._soc.recv(4))
-            msg = self._soc.recv(size)
+            self._soc.connect(self._host_addr)
+            self._is_connected = True
         except TimeoutError as e:
             self._clean_up()
             raise e
@@ -189,31 +188,17 @@ class TCPClient:
             self._clean_up()
             raise e
 
-        if msg == b'CONNECTION ACCEPTED':
-            self._is_connected = True
-            logger.info("Successfully connected to %s @ %d", self._addr[0], self._addr[1])
-            return True
-        elif msg == b'SERVER FULL':
-            self._clean_up()
-            logger.info("Connection to %s @ %d was denied due to the server being full",
-                        self._addr[0], self._addr[1])
-            return False
-        else:
-            self._clean_up()
-            logger.error("Unrecognized reply from %s @ %d. Size=%d", self._addr[0], self._addr[1], size)
-            return False
-
     def disconnect(self):
         """
         Disconnect from the currently connected host. If no connection is opened, this method does nothing.
         """
         if self._is_connected:
             self._clean_up()
-            logger.info("Disconnected from %s @ %d", self._addr[0], self._addr[1])
+            logger.info("Disconnected from host")
 
-    def send_bytes(self, data: bytes):
+    def send(self, data: bytes):
         """
-        Send raw bytes to the host. Attaches a 4 bytes size header before sending. Returns True on successful
+        Send raw bytes. Attaches a 4 bytes size header before sending. Returns True on successful
         transmission, False on failed transmission. Raises TimeoutError, ConnectionError, socket.gaierror, and OSError.
         """
         if not self._is_connected:
@@ -237,15 +222,6 @@ class TCPClient:
             self._clean_up()
             raise e
 
-    def send(self, msg: str, encoding: str='utf-8') -> bool:
-        """
-        Send a message to the host as a string. If no encoding is given, utf-8 is assumed. Attaches a 4 bytes size header
-        before sending. Returns True on successful transmission, False on failed transmission. Raises TimeoutError,
-        ConnectionError, socket.gaierror, and OSError.
-        """
-        data = bytes(msg, encoding=encoding)
-        return self.send_bytes(data)
-
     def iter_receive(self, buff_size: int = 4096) -> Generator[bytes | int, None, None]:
         """
         Returns a generator for iterating over the bytes of an incoming message. An integer representing the message
@@ -262,7 +238,7 @@ class TCPClient:
             return
         size = decode_header(header)
         logger.debug("Incoming message from %s @ %d, SIZE=%d",
-                     self._addr[0], self._addr[1], size)
+                     self._host_addr[0], self._host_addr[1], size)
         yield size
         if size < buff_size:
             buff_size = size
@@ -276,9 +252,9 @@ class TCPClient:
                 buff_size = remaining
             yield data
 
-    def receive_bytes(self, buff_size: int = 4096) -> bytearray:
+    def receive(self, buff_size: int = 4096) -> bytearray:
         """
-        Receive raw bytes from the host. Returns a bytearray. Raises TimeoutError, ConnectionError,
+        Receive raw bytes. Returns a bytearray. Raises TimeoutError, ConnectionError,
         socket.gaierror, and OSError.
         """
         data = bytearray()
@@ -295,12 +271,5 @@ class TCPClient:
             if not chunk:
                 return data
             data.extend(chunk)
-        logger.debug("Received a total of %d bytes from %s @ %d", len(data), self._addr[0], self._addr[1])
+        logger.debug("Received a total of %d bytes from %s @ %d", len(data), self._host_addr[0], self._host_addr[1])
         return data
-
-    def receive(self, encoding: str="utf-8") -> str:
-        """
-        Receive a message from the host as a string. If no encoding is given, utf-8 is assumed. Raises TimeoutError,
-        ConnectionError, socket.gaierror, and OSError.
-        """
-        return str(self.receive_bytes(), encoding=encoding)

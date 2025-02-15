@@ -21,7 +21,7 @@ log_folder = setup_log_folder("TestSendRecv")
 class TestSendRecv:
     @staticmethod
     def send(client, thread_id, data, completed_q):
-        client.send_bytes(data)
+        client.send(data)
         completed_q.put(f"{thread_id} SENT")
 
     @staticmethod
@@ -29,15 +29,15 @@ class TestSendRecv:
         if is_str:
             client.send(data)
         else:
-            client.send_bytes(data)
+            client.send(data)
         time.sleep(0.1)
         server_copy = server.pop_msg(block=True)
         if is_str:
             server.send(server_copy.client_id, str(server_copy.data, encoding="utf-8"))
             client_copy = client.receive()
         else:
-            server.send_bytes(server_copy.client_id, server_copy.data)
-            client_copy = client.receive_bytes()
+            server.send(server_copy.client_id, server_copy.data)
+            client_copy = client.receive()
         return server_copy, client_copy
 
 
@@ -67,7 +67,7 @@ class TestSendRecv:
                          os.path.join(log_folder, "test_send_file.log"),
                          logging.DEBUG,
                          "test_send_file-filehandler")
-        with open(os.path.abspath(os.path.join("dummy_files", "video1.mkv")), 'rb') as file:
+        with open(os.path.abspath(os.path.join("../tests/dummy_files", "video1.mkv")), 'rb') as file:
             video = file.read()
 
         server.start()
@@ -90,7 +90,7 @@ class TestSendRecv:
                          os.path.join(log_folder, "test_send_file_multi_client.log"),
                          logging.DEBUG,
                          "test_send_file_multi_client-filehandler")
-        with open(os.path.abspath(os.path.join("dummy_files", "photo.jpg")), 'rb') as file:
+        with open(os.path.abspath(os.path.join("../tests/dummy_files", "photo.jpg")), 'rb') as file:
             photo = file.read()
 
         completed = queue.Queue()
@@ -121,7 +121,7 @@ class TestSendRecv:
                          logging.DEBUG,
                          "test_client_to_client_send_recv-filehandler")
 
-        with open(os.path.abspath(os.path.join("dummy_files", "video1.mkv")), 'rb') as file:
+        with open(os.path.abspath(os.path.join("../tests/dummy_files", "video1.mkv")), 'rb') as file:
             video = file.read()
 
         client1 = client_list[0]
@@ -139,9 +139,9 @@ class TestSendRecv:
 
         assert client1_cpy == client2_cpy
 
-        client1.send_bytes(video)
-        client2_cpy = client2.receive_bytes()
-        client2.send_bytes(client2_cpy)
-        client1_cpy = client1.receive_bytes()
+        client1.send(video)
+        client2_cpy = client2.receive()
+        client2.send(client2_cpy)
+        client1_cpy = client1.receive()
 
         assert client1_cpy == client2_cpy

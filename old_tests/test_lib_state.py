@@ -90,7 +90,7 @@ class TestLibState:
         try:
             assert client_info["is_running"] is True
             assert client_info["timeout"] is None
-            assert client_info["addr"] == (HOST, client_proc._tcp_client._addr[1])
+            assert client_info["addr"] == (HOST, client_proc._tcp_client._host_addr[1])
         except KeyError:
             assert False
 

@@ -74,10 +74,8 @@ class TCPServer:
                 if self.is_full:
                     logger.warning("%s @ %d was denied connection due to server being full",
                                    client_addr[0], client_addr[1])
-                    client_soc.sendall(encode_msg(b'SERVER FULL'))
                     client_soc.close()
                     continue
-                client_soc.sendall(encode_msg(b'CONNECTION ACCEPTED'))
                 self._start_client_proc(self._generate_client_id(), client_soc)
             except OSError:
                 if self._soc is None:
@@ -106,19 +104,9 @@ class TCPServer:
     @property
     def addr(self) -> tuple[str, int]:
         """
-        Returns a tuple with the current ip (str) and the port (int) the server is listening on.
+        Returns a tuple with the current address the server is listening on.
         """
         return self._addr
-
-    @addr.setter
-    def addr(self, value: tuple[str, int]):
-        """
-        Allows for the address to be changed after class creation. If the server is running, this function does
-        nothing.
-        """
-        if self._is_running:
-            return
-        self._addr = value
 
     @property
     def is_running(self) -> bool:
@@ -283,7 +271,7 @@ class TCPServer:
         """
         return not self._messages.empty()
 
-    def send_bytes(self, client_id: str, data: bytes) -> bool:
+    def send(self, client_id: str, data: bytes) -> bool:
         """
         Sends data to a connected client. Returns True on successful sending, False if not or if a client with
         client_id could not be found.
@@ -297,11 +285,7 @@ class TCPServer:
         self._connected_clients_lock.release()
         return client.send(data)
 
-    def send(self, client_id: str, msg: str, encoding: str="utf-8") -> bool:
-        data = bytes(msg, encoding=encoding)
-        return self.send_bytes(client_id, data)
-
-    def start(self) -> bool:
+    def start(self, addr: tuple[str, int]) -> bool:
         """
         Starts the server. Returns True on successful start up, False if not.
         """
@@ -309,8 +293,9 @@ class TCPServer:
             return False
         if not self._create_soc():
             return False
+        self._addr = addr
+        threading.Thread(target=self._mainloop).start()
         self._is_running = True
-        threading.Thread(target=self._mainloop, daemon=True).start()
         logger.info("Server has been started")
         return True
 
@@ -327,4 +312,5 @@ class TCPServer:
             self._soc.close()
             self._soc = None
             self._is_running = False
+            self._addr = (None, None)
             logger.info("Server has been stopped")

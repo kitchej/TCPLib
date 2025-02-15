@@ -36,7 +36,7 @@ class ClientProcessor:
         data = bytearray()
         while self._is_running:
             try:
-                data = self._tcp_client.receive_bytes(self._buff_size)
+                data = self._tcp_client.receive(self._buff_size)
             except Exception as e:
                 logger.debug("Exception while receiving from %s @ %d", self._tcp_client.addr[0],
                              self._tcp_client.addr[1], exc_info=e)
@@ -106,7 +106,7 @@ class ClientProcessor:
         Send bytes to the client with a 4 byte header attached. Returns True on successful transmission,
         False on failed transmission. Raises TimeoutError, ConnectionError, socket.gaierror, and OSError.
         """
-        return self._tcp_client.send_bytes(data)
+        return self._tcp_client.send(data)
 
     def stop(self):
         """

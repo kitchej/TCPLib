@@ -12,7 +12,7 @@ import shutil
 
 from src.TCPLib.tcp_client import TCPClient
 from src.TCPLib.tcp_server import TCPServer
-from src.TCPLib.utils import encode_msg
+from src.TCPLib.utils import encode_msg, decode_header
 
 from tests.globals_for_tests import HOST, PORT
 
@@ -44,30 +44,51 @@ def setup_log_folder(folder_name):
     return log_folder
 
 
-class DummyServer:
+class DummyClient:
     def __init__(self, host, port):
         self.soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.soc.bind((host, port))
+        self.host_addr = (HOST, PORT)
 
-    def listen(self):
-        self.soc.listen()
-        client_soc, _ = self.soc.accept()
-        time.sleep(0.1)
-        client_soc.sendall(encode_msg(b'CONNECTION ACCEPTED'))
+    def send(self, data: bytes, bandwith=0, latency=0):
+        self.soc.sendall(data)
+
+    def connect(self):
+        self.soc.connect(self.host_addr)
 
     def close(self):
-        self.soc.close()
+        if self.soc is not None:
+            self.soc.close()
+            self.soc = None
+
+
+class DummyServer(DummyClient):
+    def __init__(self, host, port):
+        DummyClient.__init__(self, host, port)
         self.soc = None
+        self.listen_soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.listen_soc.bind((host, port))
+
+    def listen(self, delay):
+        self.listen_soc.listen()
+        time.sleep(delay)
+        client_soc, _ = self.soc.accept()
+        self.soc = client_soc
+        self.listen_soc.close()
+
+    def start(self, delay=0):
+        threading.Thread(target=self.listen, args=[delay]).start()
+        time.sleep(0.1)
 
 
 @pytest.fixture
 def dummy_server():
     s = DummyServer(HOST, PORT)
-    threading.Thread(target=s.listen).start()
-    time.sleep(0.1)
     yield s
     s.close()
 
+@pytest.fixture
+def dummy_server2(dummy_server):
+    yield dummy_server
 
 @pytest.fixture
 def dummy_client():
@@ -89,10 +110,7 @@ def server():
 
 @pytest.fixture
 def client():
-    c = TCPClient(
-        host=HOST,
-        port=PORT
-    )
+    c = TCPClient()
     yield c
     c.disconnect()
 
@@ -100,7 +118,7 @@ def client():
 @pytest.fixture
 def client_list(request):
     num_clients = request.param
-    clients = [TCPClient(host=HOST, port=PORT) for _ in range(num_clients)]
+    clients = [TCPClient() for _ in range(num_clients)]
     yield clients
     for client in clients:
         client.disconnect()
