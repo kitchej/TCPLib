@@ -62,6 +62,26 @@ class TestTCPClient:
         assert client._timeout is 10
         assert client._is_connected is False
 
+    def test_from_socket(self, dummy_server):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_from_socket.log"),
+                         logging.DEBUG,
+                         "test_from_socket-filehandler")
+        soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        dummy_server.start()
+        soc.connect((HOST, PORT))
+        c = TCPClient.from_socket(soc)
+
+        assert isinstance(c._soc, socket.socket)
+        assert c._listen_soc is None
+        assert c._remote_addr == (None, None)
+        assert c._host_addr == (HOST, PORT)
+        assert c._timeout is None
+        assert c._is_connected is True
+
+        c.disconnect()
+
+
     def test_connect_exp(self, dummy_server, client):
         add_file_handler(logger,
                          os.path.join(log_folder, "test_connect_exp.log"),

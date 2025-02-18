@@ -34,7 +34,7 @@ class TCPClient:
         Allows for a client to be created from a socket object.
         The socket must be initialized and connected.
         """
-        out = cls(None, None, soc.gettimeout())
+        out = cls(soc.gettimeout())
         out._soc = soc
         out._host_addr = soc.getpeername()
         out._is_connected = True
@@ -114,7 +114,7 @@ class TCPClient:
         return self._host_addr
 
     @host_addr.setter
-    def host_addr(self, value) -> tuple[str, int]:
+    def host_addr(self, value):
         return
 
     @property
@@ -125,7 +125,7 @@ class TCPClient:
         return self._remote_addr
 
     @remote_addr.setter
-    def remote_addr(self, value) -> tuple[str, int]:
+    def remote_addr(self, value):
         return
 
     def host_single_client(self, addr: tuple[int, str], timeout: int = None):
