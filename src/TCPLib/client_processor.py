@@ -23,29 +23,34 @@ class ClientProcessor:
         self._client_id = client_id
         self._tcp_client = TCPClient.from_socket(client_soc)
         self._tcp_client.timeout = timeout
+        self._remote_addr = self._tcp_client.host_addr
         self._msg_q = msg_q
         self._buff_size = buff_size
-        self._is_running = True
-        th = threading.Thread(target=self._receive_loop)
-        th.start()
-        logger.info(f"Processing %s @ %d as client #%s", self.addr[0], self.addr[1], self._client_id)
+        self._is_running = False
 
     def _receive_loop(self):
         logger.debug("Client %s is listening for new messages from %s @ %d",
-                     self._client_id, self.addr[0], self.addr[1])
+                     self._client_id, self.remote_addr[0], self.remote_addr[1])
         data = bytearray()
         while self._is_running:
             try:
                 data = self._tcp_client.receive(self._buff_size)
             except Exception as e:
-                logger.debug("Exception while receiving from %s @ %d", self._tcp_client.addr[0],
-                             self._tcp_client.addr[1], exc_info=e)
+                logger.debug("Exception while receiving from %s @ %d", self.remote_addr[0],
+                             self.remote_addr[1], exc_info=e)
                 self.stop()
                 self._msg_q.put(Message(len(data), data, self._client_id))
                 return
             if len(data) == 0:
                 continue
             self._msg_q.put(Message(len(data), data, self._client_id))
+
+    def start(self):
+        th = threading.Thread(target=self._receive_loop)
+        th.start()
+        self._is_running = True
+        logger.info(f"Processing connection to %s @ %d as client #%s", self.remote_addr[0],
+                    self.remote_addr[1], self._client_id)
 
     @property
     def id(self) -> str:
@@ -76,19 +81,18 @@ class ClientProcessor:
         self._tcp_client.timeout = timeout
 
     @property
-    def addr(self) -> tuple[str, int]:
+    def remote_addr(self) -> tuple[str, int]:
         """
         Returns a tuple with the host's ip (str) and the port (int)
         """
-        return self._tcp_client.addr
+        return self._remote_addr
 
-    @addr.setter
-    def addr(self, value: tuple[str, int]):
+    @remote_addr.setter
+    def remote_addr(self, value):
         """
-        Allows for the address to be changed after class creation. If the server is running, this function will do
-        nothing.
+        This should never be changed. Ever.
         """
-        self._tcp_client.addr = value
+        return
 
     @property
     def is_running(self):

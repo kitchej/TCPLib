@@ -5,8 +5,6 @@ import logging
 import os
 import socket
 
-import pytest
-
 from tests.globals_for_tests import setup_log_folder, HOST, PORT
 from src.log_util import add_file_handler
 from src.TCPLib.tcp_client import TCPClient
@@ -17,11 +15,11 @@ log_folder = setup_log_folder("TestTCPClient")
 
 
 class TestTCPClient:
-    def test_init(self, client, dummy_server):
+    def test_class_state(self, client, dummy_server):
         add_file_handler(logger,
-                         os.path.join(log_folder, "test_init.log"),
+                         os.path.join(log_folder, "test_class_state.log"),
                          logging.DEBUG,
-                         "test_init-filehandler")
+                         "test_class_state-filehandler")
         dummy_server.start()
 
         assert client._soc is None

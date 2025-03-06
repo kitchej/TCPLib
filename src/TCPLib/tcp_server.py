@@ -83,23 +83,14 @@ class TCPServer:
                 logger.exception(f"Exception occurred while listening on %s @ %d", self._addr[0], self._addr[1])
                 break
 
-    def _on_connect(self, *args, **kwargs):
-        """
-        Overridable method that runs once the client is connected. Returning 'False' from this method will
-        disconnect the client and abort client setup.
-        """
-        pass
-
     def _start_client_proc(self, client_id: str, client_soc: socket.socket):
-        result = self._on_connect(client_soc, client_id)
-        if result is False:
-            client_soc.close()
-            return
         client_proc = ClientProcessor(client_id=client_id,
                                       client_soc=client_soc,
                                       msg_q=self._messages,
                                       timeout=self._timeout)
+        client_proc.start()
         self._update_connected_clients(client_proc.id, client_proc)
+
 
     @property
     def addr(self) -> tuple[str, int]:

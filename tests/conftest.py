@@ -2,7 +2,7 @@
 conftest.py
 Written by: Joshua Kitchen - 2024
 """
-
+import queue
 import threading
 import pytest
 import time
@@ -12,9 +12,10 @@ import shutil
 
 from src.TCPLib.tcp_client import TCPClient
 from src.TCPLib.tcp_server import TCPServer
+from src.TCPLib.client_processor import ClientProcessor
 from src.TCPLib.utils import encode_msg, decode_header
 
-from tests.globals_for_tests import HOST, PORT
+from tests.globals_for_tests import HOST, PORT, DUMMY_ID
 
 
 def pytest_collection_modifyitems(items):
@@ -44,7 +45,7 @@ def setup_log_folder(folder_name):
     return log_folder
 
 
-class DummyClient:
+class ConfigurableClient:
     def __init__(self, host, port):
         self.soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.host_addr = (HOST, PORT)
@@ -61,9 +62,9 @@ class DummyClient:
             self.soc = None
 
 
-class DummyServer(DummyClient):
+class DummyServer(ConfigurableClient):
     def __init__(self, host, port):
-        DummyClient.__init__(self, host, port)
+        ConfigurableClient.__init__(self, host, port)
         self.soc = None
         self.listen_soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.listen_soc.bind((host, port))
@@ -71,7 +72,7 @@ class DummyServer(DummyClient):
     def listen(self, delay):
         self.listen_soc.listen()
         time.sleep(delay)
-        client_soc, _ = self.soc.accept()
+        client_soc, _ = self.listen_soc.accept()
         self.soc = client_soc
         self.listen_soc.close()
 
@@ -85,10 +86,6 @@ def dummy_server():
     s = DummyServer(HOST, PORT)
     yield s
     s.close()
-
-@pytest.fixture
-def dummy_server2(dummy_server):
-    yield dummy_server
 
 @pytest.fixture
 def dummy_client():
@@ -106,6 +103,15 @@ def server():
     time.sleep(0.1)
     yield s
     s.stop()
+
+@pytest.fixture
+def client_processor(dummy_client, dummy_server):
+    dummy_server.start()
+    dummy_client.connect((HOST, PORT))
+    time.sleep(0.1)
+    p = ClientProcessor(DUMMY_ID, dummy_server.soc, queue.Queue())
+    yield p, dummy_client
+    p._is_running = False
 
 
 @pytest.fixture
