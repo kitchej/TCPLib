@@ -1,13 +1,14 @@
 import threading
-import threading
 import time
 import logging
 import os
 import socket
+import pytest
 
-from tests.globals_for_tests import setup_log_folder, HOST, PORT
-from src.log_util import add_file_handler
-from src.TCPLib.tcp_client import TCPClient
+from globals_for_tests import setup_log_folder, HOST, PORT
+from log_util import add_file_handler
+from TCPLib.tcp_client import TCPClient
+from TCPLib.utils import encode_msg, decode_header
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -15,6 +16,39 @@ log_folder = setup_log_folder("TestTCPClient")
 
 
 class TestTCPClient:
+
+    @staticmethod
+    def assert_default_state(c):
+        assert c._soc is None
+        assert c._listen_soc is None
+        assert c._remote_addr == (None, None)
+        assert c._host_addr == (None, None)
+        assert c._timeout is None
+        assert c._is_connected is False
+
+    @staticmethod
+    def assert_excep_raised_on_connect(c, excep):
+        try:
+            c.connect((HOST, PORT))
+        except Exception as e:
+            assert isinstance(e, excep)
+
+    @staticmethod
+    def assert_excep_raised_on_send(c, excep):
+        c.connect((HOST, PORT))
+        try:
+            c.send(b"Hello World!")
+        except Exception as e:
+            assert isinstance(e, excep)
+
+    @staticmethod
+    def assert_excep_raised_on_recv(c, excep):
+        c.connect((HOST, PORT))
+        try:
+            c.receive()
+        except Exception as e:
+            assert isinstance(e, excep)
+
     def test_class_state(self, client, dummy_server):
         add_file_handler(logger,
                          os.path.join(log_folder, "test_class_state.log"),
@@ -22,12 +56,7 @@ class TestTCPClient:
                          "test_class_state-filehandler")
         dummy_server.start()
 
-        assert client._soc is None
-        assert client._listen_soc is None
-        assert client._remote_addr == (None, None)
-        assert client._host_addr == (None, None)
-        assert client._timeout is None
-        assert client._is_connected is False
+        self.assert_default_state(client)
 
         client.connect((HOST, PORT))
 
@@ -46,6 +75,7 @@ class TestTCPClient:
         client.timeout = 10
         assert client.timeout == 10
         assert client._soc.timeout == 10
+        client.timeout = None
 
         assert client.host_addr == (HOST, PORT)
         client.host_addr = ("192.168.010", 6000)
@@ -53,12 +83,7 @@ class TestTCPClient:
 
         client.disconnect()
 
-        assert client._soc is None
-        assert client._listen_soc is None
-        assert client._remote_addr == (None, None)
-        assert client._host_addr == (None, None)
-        assert client._timeout is 10
-        assert client._is_connected is False
+        self.assert_default_state(client)
 
     def test_from_socket(self, dummy_server):
         add_file_handler(logger,
@@ -79,43 +104,12 @@ class TestTCPClient:
 
         c.disconnect()
 
-
-    def test_connect_exp(self, dummy_server, client):
-        add_file_handler(logger,
-                         os.path.join(log_folder, "test_connect_exp.log"),
-                         logging.DEBUG,
-                         "test_connect_exp-filehandler")
-
-        client.timeout = 0.1
-        try:
-            client.connect((HOST, PORT))
-        except Exception as e:
-            assert isinstance(e, TimeoutError)
-
-        client.timeout = None
-        try:
-            client.connect((HOST, PORT))
-        except Exception as e:
-            assert isinstance(e, ConnectionError)
-
-        try:
-            client.connect(("1234", 5000))
-        except Exception as e:
-            assert isinstance(e, socket.gaierror)
-
-        # Test catch osError (If I can figure out a good way to raise it)
-
     def test_host_single_client(self, client, dummy_client):
         add_file_handler(logger,
                          os.path.join(log_folder, "test_host_single_client.log"),
                          logging.DEBUG,
                          "test_host_single_client-filehandler")
-        assert client._soc is None
-        assert client._listen_soc is None
-        assert client._remote_addr == (None, None)
-        assert client._host_addr == (None, None)
-        assert client._timeout is None
-        assert client._is_connected is False
+        self.assert_default_state(client)
 
         try:
             client.host_single_client((HOST, PORT), timeout=0.1)
@@ -136,10 +130,245 @@ class TestTCPClient:
 
         client.disconnect()
 
-        assert client._soc is None
-        assert client._listen_soc is None
-        assert client._remote_addr == (None, None)
-        assert client._host_addr == (None, None)
-        assert client._timeout is None
-        assert client._is_connected is False
+        self.assert_default_state(client)
+
+    # Test exceptions in connect()
+
+    @pytest.mark.parametrize('error_client', [(TimeoutError, "connect")], indirect=True)
+    def test_connect_timeout_error(self, error_client):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_connect_timeout_error.log"),
+                         logging.DEBUG,
+                         "test_connect_timeout_error-filehandler")
+
+        self.assert_excep_raised_on_connect(error_client, error_client._soc.excep)
+        self.assert_default_state(error_client)
+
+    @pytest.mark.parametrize('error_client', [(ConnectionError, "connect")], indirect=True)
+    def test_connect_connection_error(self, error_client):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_connect_connection_error.log"),
+                         logging.DEBUG,
+                         "test_connect_connection_error-filehandler")
+
+        self.assert_excep_raised_on_connect(error_client, error_client._soc.excep)
+        self.assert_default_state(error_client)
+
+    @pytest.mark.parametrize('error_client', [(socket.gaierror, "connect")], indirect=True)
+    def test_connect_gai_error(self, error_client):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_connect_gai_error.log"),
+                         logging.DEBUG,
+                         "test_connect_gai_error-filehandler")
+
+        self.assert_excep_raised_on_connect(error_client, error_client._soc.excep)
+        self.assert_default_state(error_client)
+
+    @pytest.mark.parametrize('error_client', [(OSError, "connect")], indirect=True)
+    def test_connect_os_error(self, error_client):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_connect_os_error.log"),
+                         logging.DEBUG,
+                         "test_connect_os_error-filehandler")
+
+        self.assert_excep_raised_on_connect(error_client, error_client._soc.excep)
+        self.assert_default_state(error_client)
+
+    # Test exceptions in send()
+
+    @pytest.mark.parametrize('error_client', [(AttributeError, "sendall")], indirect=True)
+    def test_send_attribute_error(self, error_client, dummy_server):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_send_attribute_error.log"),
+                         logging.DEBUG,
+                         "test_send_attribute_error-filehandler")
+
+        dummy_server.start()
+
+        self.assert_excep_raised_on_send(error_client, error_client._soc.excep)
+        self.assert_default_state(error_client)
+
+    @pytest.mark.parametrize('error_client', [(TimeoutError, "sendall")], indirect=True)
+    def test_send_timeout_error(self, error_client, dummy_server):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_send_timeout_error.log"),
+                         logging.DEBUG,
+                         "test_send_timeout_error-filehandler")
+
+        dummy_server.start()
+
+        self.assert_excep_raised_on_send(error_client, error_client._soc.excep)
+        self.assert_default_state(error_client)
+
+    @pytest.mark.parametrize('error_client', [(ConnectionError, "sendall")], indirect=True)
+    def test_send_connection_error(self, error_client, dummy_server):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_send_connection_error.log"),
+                         logging.DEBUG,
+                         "test_send_connection_error-filehandler")
+
+        dummy_server.start()
+
+        self.assert_excep_raised_on_send(error_client, error_client._soc.excep)
+        self.assert_default_state(error_client)
+
+    @pytest.mark.parametrize('error_client', [(socket.gaierror, "sendall")], indirect=True)
+    def test_send_gai_error(self, error_client, dummy_server):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_send_gai_error.log"),
+                         logging.DEBUG,
+                         "test_send_gai_error-filehandler")
+
+        dummy_server.start()
+
+        self.assert_excep_raised_on_send(error_client, error_client._soc.excep)
+        self.assert_default_state(error_client)
+
+    @pytest.mark.parametrize('error_client', [(OSError, "sendall")], indirect=True)
+    def test_send_os_error(self, error_client, dummy_server):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_send_os_error.log"),
+                         logging.DEBUG,
+                         "test_send_os_error-filehandler")
+
+        dummy_server.start()
+
+        self.assert_excep_raised_on_send(error_client, error_client._soc.excep)
+        self.assert_default_state(error_client)
+
+    # Test exceptions in receive()
+    # Also tests iter_receive() and _receive_chunk() since receive() calls both
+
+    @pytest.mark.parametrize('error_client', [(AttributeError, "recv")], indirect=True)
+    def test_recv_attribute_error(self, error_client, dummy_server):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_recv_attribute_error.log"),
+                         logging.DEBUG,
+                         "test_recv_attribute_error-filehandler")
+
+        dummy_server.start()
+
+        self.assert_excep_raised_on_recv(error_client, error_client._soc.excep)
+        self.assert_default_state(error_client)
+
+    @pytest.mark.parametrize('error_client', [(TimeoutError, "recv")], indirect=True)
+    def test_recv_timeout_error(self, error_client, dummy_server):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_recv_timeout_error.log"),
+                         logging.DEBUG,
+                         "test_recv_timeout_error-filehandler")
+
+        dummy_server.start()
+
+        self.assert_excep_raised_on_recv(error_client, error_client._soc.excep)
+        self.assert_default_state(error_client)
+
+    @pytest.mark.parametrize('error_client', [(ConnectionError, "recv")], indirect=True)
+    def test_recv_connection_error(self, error_client, dummy_server):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_recv_connection_error.log"),
+                         logging.DEBUG,
+                         "test_recv_connection_error-filehandler")
+
+        dummy_server.start()
+
+        self.assert_excep_raised_on_recv(error_client, error_client._soc.excep)
+        self.assert_default_state(error_client)
+
+    @pytest.mark.parametrize('error_client', [(socket.gaierror, "recv")], indirect=True)
+    def test_recv_gai_error(self, error_client, dummy_server):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_recv_gai_error.log"),
+                         logging.DEBUG,
+                         "test_recv_gai_error-filehandler")
+
+        dummy_server.start()
+
+        self.assert_excep_raised_on_recv(error_client, error_client._soc.excep)
+        self.assert_default_state(error_client)
+
+    @pytest.mark.parametrize('error_client', [(OSError, "recv")], indirect=True)
+    def test_recv_os_error(self, error_client, dummy_server):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_recv_os_error.log"),
+                         logging.DEBUG,
+                         "test_recv_os_error-filehandler")
+
+        dummy_server.start()
+
+        self.assert_excep_raised_on_recv(error_client, error_client._soc.excep)
+        self.assert_default_state(error_client)
+
+    # Test send/recv functionality
+
+    def test_send(self, client, dummy_server):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_recv_os_error.log"),
+                         logging.DEBUG,
+                         "test_recv_os_error-filehandler")
+
+        msg1 = b"Hello World!"
+        msg2 = b"foofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoo"
+        dummy_server.start()
+        client.connect((HOST, PORT))
+
+        client.send(msg1)
+        time.sleep(0.1)
+        _ = dummy_server.soc.recv(4)
+        server_cpy = dummy_server.soc.recv(1024)
+        assert server_cpy == msg1
+
+        client.send(msg2)
+        time.sleep(0.1)
+        _ = dummy_server.soc.recv(4)
+        server_cpy = dummy_server.soc.recv(1024)
+        assert server_cpy == msg2
+
+    def test_recv_chunk(self, client, dummy_server):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_recv_chunk.log"),
+                         logging.DEBUG,
+                         "test_recv_chunk-filehandler")
+
+        dummy_server.start()
+        client.connect((HOST, PORT))
+        time.sleep(0.1)
+
+        dummy_server.send(b"Hello World!")
+        time.sleep(0.1)
+        data = client._receive_chunk(4)
+        assert len(data) == 4
+
+        dummy_server.send(b"Hello World!")
+        time.sleep(0.1)
+        data = client._receive_chunk(12)
+        assert len(data) == 12
+
+    def test_iter_receive(self, client, dummy_server):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_iter_receive.log"),
+                         logging.DEBUG,
+                         "test_iter_receive-filehandler")
+
+        dummy_server.start()
+        client.connect((HOST, PORT))
+        time.sleep(0.1)
+        msg = b"Hello World!"
+        dummy_server.send(encode_msg(msg))
+        time.sleep(0.1)
+        gen = client.iter_receive(1)
+
+        size = next(gen)
+        assert size == len(msg)
+
+        for char in msg:
+            assert chr(char) == str(next(gen), encoding='utf-8')
+
+
+
+
+
+
+
+
 

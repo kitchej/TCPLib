@@ -36,7 +36,10 @@ class TCPClient:
         """
         out = cls(soc.gettimeout())
         out._soc = soc
-        out._host_addr = soc.getpeername()
+        try:
+            out._host_addr = soc.getpeername()
+        except OSError:  # Not connected
+            return out
         out._is_connected = True
         return out
 
@@ -107,7 +110,7 @@ class TCPClient:
             self._soc.settimeout(self._timeout)
 
     @property
-    def host_addr(self) -> tuple[str, int]:
+    def host_addr(self) -> tuple[str | None, int | None]:
         """
         Returns a tuple with the host's address
         """
@@ -118,7 +121,7 @@ class TCPClient:
         return
 
     @property
-    def remote_addr(self) -> tuple[str, int]:
+    def remote_addr(self) -> tuple[str | None, int | None]:
         """
         Returns a tuple with the remote client's address
         """
@@ -168,7 +171,8 @@ class TCPClient:
         """
         if self._is_connected:
             return False
-        self._soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        if not self._soc:
+            self._soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._soc.settimeout(self._timeout)
         self._host_addr = addr
         logger.info("Attempting to connect to %s @ %d", self._host_addr[0], self._host_addr[1])

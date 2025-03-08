@@ -2,10 +2,10 @@ import time
 import logging
 import os
 
-import src.TCPLib.utils as utils
+import TCPLib.utils as utils
 
-from tests.globals_for_tests import setup_log_folder, DUMMY_ID
-from src.log_util import add_file_handler
+from globals_for_tests import setup_log_folder, DUMMY_ID
+from log_util import add_file_handler
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)

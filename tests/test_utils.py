@@ -2,7 +2,7 @@
 test_client_mgmt.py
 Written by: Joshua Kitchen - 2024
 """
-import src.TCPLib.utils as utils
+import TCPLib.utils as utils
 
 
 class TestUtils:
