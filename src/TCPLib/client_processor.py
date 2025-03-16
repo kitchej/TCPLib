@@ -23,7 +23,7 @@ class ClientProcessor:
         self._client_id = client_id
         self._tcp_client = TCPClient.from_socket(client_soc)
         self._tcp_client.timeout = timeout
-        self._remote_addr = self._tcp_client.host_addr
+        self._remote_addr = client_soc.getpeername()
         self._msg_q = msg_q
         self._buff_size = buff_size
         self._is_running = False
@@ -32,25 +32,29 @@ class ClientProcessor:
         logger.debug("Client %s is listening for new messages from %s @ %d",
                      self._client_id, self.remote_addr[0], self.remote_addr[1])
         data = bytearray()
+        self._is_running = True
         while self._is_running:
             try:
                 data = self._tcp_client.receive(self._buff_size)
-            except Exception as e:
-                logger.debug("Exception while receiving from %s @ %d", self.remote_addr[0],
-                             self.remote_addr[1], exc_info=e)
+            except AttributeError:  # Socket was closed from another thread
                 self.stop()
-                self._msg_q.put(Message(len(data), data, self._client_id))
                 return
+            except TimeoutError:
+                self.stop()
+                return
+            except ConnectionError:
+                self.stop()
+                return
+            except socket.gaierror:
+                self.stop()
+                return
+            except OSError:
+                self.stop()
+                return
+
             if len(data) == 0:
                 continue
             self._msg_q.put(Message(len(data), data, self._client_id))
-
-    def start(self):
-        th = threading.Thread(target=self._receive_loop)
-        th.start()
-        self._is_running = True
-        logger.info(f"Processing connection to %s @ %d as client #%s", self.remote_addr[0],
-                    self.remote_addr[1], self._client_id)
 
     @property
     def id(self) -> str:
@@ -83,7 +87,7 @@ class ClientProcessor:
     @property
     def remote_addr(self) -> tuple[str, int]:
         """
-        Returns a tuple with the host's ip (str) and the port (int)
+        Returns a tuple with the client's ip (str) and the port (int)
         """
         return self._remote_addr
 
@@ -111,6 +115,15 @@ class ClientProcessor:
         False on failed transmission. Raises TimeoutError, ConnectionError, socket.gaierror, and OSError.
         """
         return self._tcp_client.send(data)
+
+    def start(self):
+        if self._is_running:
+            return
+
+        th = threading.Thread(target=self._receive_loop)
+        th.start()
+        logger.info(f"Processing connection to %s @ %d as client #%s", self.remote_addr[0],
+                    self.remote_addr[1], self._client_id)
 
     def stop(self):
         """

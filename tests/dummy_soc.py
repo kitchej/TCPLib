@@ -2,6 +2,7 @@ import threading
 import time
 import socket
 
+
 class ConfigurableClient:
     def __init__(self, host, port):
         self.soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -59,6 +60,7 @@ class SocRaiseErr(socket.socket):
             - sendall
             - recv
     """
+
     def __init__(self, *args, **kwargs):
         try:
             self.excep = kwargs['excep']
@@ -76,23 +78,20 @@ class SocRaiseErr(socket.socket):
         if self.func_to_fail == 'connect':
             if self.excep:
                 raise self.excep
-
         super().connect(address)
 
-
-    def sendall(self, data, flags = ..., /):
+    def sendall(self, data, flags=..., /):
         if self.func_to_fail == 'sendall':
             if self.excep:
                 raise self.excep
-
         if flags is ...:
-            super().sendall(data, 0)
-        else:
-            super().sendall(data, flags)
+            flags = 0
+        super().sendall(data, flags)
 
-    def recv(self, bufsize, flags = ..., /):
+    def recv(self, bufsize, flags=..., /):
         if self.func_to_fail == 'recv':
             if self.excep:
                 raise self.excep
-
+        if flags is ...:
+            flags = 0
         super().recv(bufsize, flags)

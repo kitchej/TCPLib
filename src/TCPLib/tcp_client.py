@@ -164,13 +164,13 @@ class TCPClient:
         self._listen_soc = None
         return
 
-    def connect(self, addr: tuple[int, str]) -> bool:
+    def connect(self, addr: tuple[int, str]):
         """
         Initiates a connection to a TCPLib server object. Raises TimeoutError, ConnectionError, and socket.gaierror.
         Returns False if the server object refused connection and True if connection was accepted.
         """
         if self._is_connected:
-            return False
+            return
         if not self._soc:
             self._soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._soc.settimeout(self._timeout)
@@ -275,5 +275,8 @@ class TCPClient:
             if not chunk:
                 return data
             data.extend(chunk)
-        logger.debug("Received a total of %d bytes from %s @ %d", len(data), self._host_addr[0], self._host_addr[1])
+        if self._host_addr == (None, None):
+            logger.debug("Received a total of %d bytes", len(data))
+        else:
+            logger.debug("Received a total of %d bytes from %s @ %d", len(data), self._host_addr[0], self._host_addr[1])
         return data

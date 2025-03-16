@@ -8,7 +8,7 @@ import pytest
 from globals_for_tests import setup_log_folder, HOST, PORT
 from log_util import add_file_handler
 from TCPLib.tcp_client import TCPClient
-from TCPLib.utils import encode_msg, decode_header
+from TCPLib.utils import encode_msg
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -309,6 +309,9 @@ class TestTCPClient:
 
         msg1 = b"Hello World!"
         msg2 = b"foofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoo"
+        with open("dummy_files/doi.txt", 'rb') as file:
+            text = file.read()
+
         dummy_server.start()
         client.connect((HOST, PORT))
 
@@ -323,6 +326,12 @@ class TestTCPClient:
         _ = dummy_server.soc.recv(4)
         server_cpy = dummy_server.soc.recv(1024)
         assert server_cpy == msg2
+
+        client.send(text)
+        time.sleep(0.1)
+        _ = dummy_server.soc.recv(4)
+        server_cpy = dummy_server.soc.recv(len(text))
+        assert server_cpy == text
 
     def test_recv_chunk(self, client, dummy_server):
         add_file_handler(logger,
@@ -350,10 +359,11 @@ class TestTCPClient:
                          logging.DEBUG,
                          "test_iter_receive-filehandler")
 
+        msg = b"Hello World!"
         dummy_server.start()
         client.connect((HOST, PORT))
         time.sleep(0.1)
-        msg = b"Hello World!"
+
         dummy_server.send(encode_msg(msg))
         time.sleep(0.1)
         gen = client.iter_receive(1)
@@ -364,7 +374,56 @@ class TestTCPClient:
         for char in msg:
             assert chr(char) == str(next(gen), encoding='utf-8')
 
+    def test_receive(self, client, dummy_server):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_receive.log"),
+                         logging.DEBUG,
+                         "test_receive-filehandler")
 
+        msg1 = b"Hello World!"
+        msg2 = b"H"
+        with open("dummy_files/doi.txt", 'rb') as file:
+            text = file.read()
+
+        dummy_server.start()
+        client.connect((HOST, PORT))
+        time.sleep(0.1)
+
+        dummy_server.send(encode_msg(msg1))
+        time.sleep(0.1)
+        assert client.receive() == msg1
+
+        dummy_server.send(encode_msg(msg2))
+        time.sleep(0.1)
+        assert client.receive() == msg2
+
+        dummy_server.send(encode_msg(text))
+        time.sleep(0.1)
+        assert client.receive() == text
+
+    def test_receive_multimedia(self, client, dummy_server):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_receive_multimedia.log"),
+                         logging.DEBUG,
+                         "test_receive_multimedia-filehandler")
+
+        with open("dummy_files/video1.mkv", 'rb') as file:
+            video = file.read()
+
+        with open("dummy_files/photo.jpg", 'rb') as file:
+            photo = file.read()
+
+        dummy_server.start()
+        client.connect((HOST, PORT))
+        time.sleep(0.1)
+
+        dummy_server.send(encode_msg(photo))
+        time.sleep(0.1)
+        assert client.receive() == photo
+
+        dummy_server.send(encode_msg(video))
+        time.sleep(0.1)
+        assert client.receive() == video
 
 
 

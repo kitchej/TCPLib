@@ -21,15 +21,11 @@ class TCPServer:
     Creates, maintains, and transmits data to multiple TCPLib.TCPClient connections.
     """
 
-    def __init__(self, host: str = None, port: int = None, max_clients: int = 0, timeout: int = None,
-                 msg_q: queue.Queue = None):
-        self._addr = (host, port)
+    def __init__(self, max_clients: int = 0, timeout: int = None):
+        self._addr = (None, None)
         self._max_clients = max_clients
         self._timeout = timeout
-        if msg_q:
-            self._messages = msg_q
-        else:
-            self._messages = queue.Queue()
+        self._messages = queue.Queue()
         self._soc = None
         self._is_running = False
         self._connected_clients = {}
@@ -66,6 +62,8 @@ class TCPServer:
         return True
 
     def _mainloop(self):
+        logger.debug("Server is listening for connections")
+        self._is_running = True
         while self.is_running:
             try:
                 self._soc.listen()
@@ -77,11 +75,12 @@ class TCPServer:
                     client_soc.close()
                     continue
                 self._start_client_proc(self._generate_client_id(), client_soc)
-            except OSError:
+            except Exception:
                 if self._soc is None:
                     break
                 logger.exception(f"Exception occurred while listening on %s @ %d", self._addr[0], self._addr[1])
                 break
+        logger.debug("Server is no longer listening for messages")
 
     def _start_client_proc(self, client_id: str, client_soc: socket.socket):
         client_proc = ClientProcessor(client_id=client_id,
@@ -183,15 +182,12 @@ class TCPServer:
         See https://docs.python.org/3/library/socket.html#socket-timeouts for more information about timeouts.
         """
         if timeout is None:
-            pass
+            return
         elif timeout < 0:
-            return False
+            return
         for client_id in self.list_clients():
             client_proc = self._get_client(client_id)
-            result = client_proc.timeout = timeout
-            if not result:
-                return False
-        return True
+            client_proc.timeout = timeout
 
     def list_clients(self) -> list:
         """
@@ -214,7 +210,7 @@ class TCPServer:
         return {
             "is_running": client.is_running,
             "timeout": client.timeout,
-            "addr": client.addr,
+            "addr": client.remote_addr,
         }
 
     def disconnect_client(self, client_id: str) -> bool:
@@ -276,19 +272,19 @@ class TCPServer:
         self._connected_clients_lock.release()
         return client.send(data)
 
-    def start(self, addr: tuple[str, int]) -> bool:
+    def start(self, addr: tuple[str, int]):
         """
         Starts the server. Returns True on successful start up, False if not.
         """
+
         if self._is_running:
-            return False
-        if not self._create_soc():
-            return False
+            return
+
         self._addr = addr
+        if not self._create_soc():
+            return
         threading.Thread(target=self._mainloop).start()
-        self._is_running = True
         logger.info("Server has been started")
-        return True
 
     def stop(self):
         """
