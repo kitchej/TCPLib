@@ -98,6 +98,10 @@ class TCPServer:
         """
         return self._addr
 
+    @addr.setter
+    def addr(self, value):
+        return
+
     @property
     def is_running(self) -> bool:
         """
@@ -254,7 +258,7 @@ class TCPServer:
 
     def has_messages(self) -> bool:
         """
-        Returns a boolean flag indicating whether the queue has messages in it or not
+        Returns a boolean flag indicating if the message queue has any messages
         """
         return not self._messages.empty()
 
@@ -274,15 +278,16 @@ class TCPServer:
 
     def start(self, addr: tuple[str, int]):
         """
-        Starts the server. Returns True on successful start up, False if not.
+        Starts the server and connects to the address provided.
+        Returns True on successful start up, False if not.
         """
 
         if self._is_running:
-            return
+            return False
 
         self._addr = addr
         if not self._create_soc():
-            return
+            return False
         threading.Thread(target=self._mainloop).start()
         logger.info("Server has been started")
 

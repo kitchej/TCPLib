@@ -133,7 +133,7 @@ class TCPClient:
 
     def host_single_client(self, addr: tuple[int, str], timeout: int = None):
         """
-        Hosts a single connection from another TCPClient object. The timeout argument sets how long this
+        Hosts a single connection from another TCP/IP client. The timeout argument sets how long this
         method will listen for a connection. Raises TimeoutError, ConnectionError, and socket.gaierror.
         """
         if self._is_connected:
@@ -164,10 +164,9 @@ class TCPClient:
         self._listen_soc = None
         return
 
-    def connect(self, addr: tuple[int, str]):
+    def connect(self, addr: tuple[str, int]):
         """
         Initiates a connection to a TCPLib server object. Raises TimeoutError, ConnectionError, and socket.gaierror.
-        Returns False if the server object refused connection and True if connection was accepted.
         """
         if self._is_connected:
             return
