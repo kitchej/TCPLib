@@ -2,9 +2,9 @@
 
 ---
 
-**NOTE: This library was made for educational purposes and should not be considered secure.**
+**NOTE: This module was made for educational purposes and should not be considered secure.**
 
-TCPLib is a library for setting up a simple TCP client and server. All data is sent and received as a bytes-like object (```bytes``` or ```bytearray```). 
+TCPLib is a module for setting up a simple TCP client and server. All data is sent and received as a bytes-like object (```bytes``` or ```bytearray```). 
 All data received is returned as a ```bytearray```.
 
 ### Example:
@@ -12,17 +12,15 @@ All data received is returned as a ```bytearray```.
 server.py
 
     from TCPLib.tcp_server import TCPServer
-    import time
-
-    server = TCPServer("127.0.0.1", 5000)
-    server.start()
+    
+    server = TCPServer()
+    server.start(("127.0.0.1", 5000))
     print("Server started")
-
+    
     client_msg = server.pop_msg(block=True)
     print(f"Message received: {client_msg.data.decode('utf-8')}")
     server.send(client_msg.client_id, client_msg.data)
-
-    time.sleep(0.1)
+    
     server.stop()
     print("Server stopped")
 
@@ -30,15 +28,23 @@ client.py
 
     from TCPLib.tcp_client import TCPClient
     
-    client = TCPClient("127.0.0.1", 5000)
-    client.connect()
-    print(f"Connected to {client.addr[0]}@{client.addr[1]}")
+    client = TCPClient()
+    client.connect(("127.0.0.1", 5000))
+    print(f"Connected to {client.host_addr[0]}@{client.host_addr[1]}")
     
     client.send(b"Hello World!")
-    echo = client.receive_all()
-    print(f"Received message from server: {echo.data.decode('utf-8')}")
+    echo = client.receive()
+    print(f"Received message from server: {echo.decode('utf-8')}")
     
     client.disconnect()
+
+Output server.py
+
+    Server started
+    Message received: Hello World!
+    Server stopped
+
+    Process finished with exit code 0
 
 Output client.py
 
@@ -47,20 +53,35 @@ Output client.py
     
     Process finished with exit code 0
 
-Output server.py
 
-    Server started
-    Message received: Hello World!
-    Server stopped
+It is also possible for a TCPClient object to host a single TCP/IP connection. Below is an example where client.py
+connects to a host client instead of a server:
+
+host_client.py 
+
+    from TCPLib.tcp_client import TCPClient
     
-    Process finished with exit code 0
+    client = TCPClient()
+    print(f"Listening for a connection...")
+    client.host_single_client(("127.0.0.1", 5000))
+    
+    client_msg = client.receive()
+    print(f"Message received from {client.remote_addr[0]}@{client.remote_addr[1]}: {client_msg.decode('utf-8')}")
+    client.send(client_msg)
+    
+    client.disconnect()
 
+output:
+
+    Listening for a connection...
+    Message received from 127.0.0.1@57003: Hello World!
+    Process finished with exit code 0
 
 
 ### Installation
 
 This package is not available on pypi at the moment, but can still be installed with pip:
 
-1.) Download the wheel file ```TCP_Lib-3.0.0-py3-none-any.whl``` from the releases page
+1.) Download the wheel file ```TCP_Lib-4.0.0-py3-none-any.whl``` from the releases page
 
 2.) In the terminal execute: ```pip install [path to wheel file]```

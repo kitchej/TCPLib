@@ -31,7 +31,6 @@ class ClientProcessor:
     def _receive_loop(self):
         logger.debug("Client %s is listening for new messages from %s @ %d",
                      self._client_id, self.remote_addr[0], self.remote_addr[1])
-        data = bytearray()
         self._is_running = True
         while self._is_running:
             try:
