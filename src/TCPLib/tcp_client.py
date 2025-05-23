@@ -6,14 +6,9 @@ import logging
 import socket
 from typing import Generator
 
-from .message import Message
 from .utils import encode_msg, decode_header
 
 logger = logging.getLogger(__name__)
-
-
-class NoAddressSupplied(Exception):
-    pass
 
 
 class NegativeBufferValue(Exception):
@@ -22,24 +17,29 @@ class NegativeBufferValue(Exception):
 
 class TCPClient:
     """
-    A basic TCP client.
+    A simple TCP client for connecting to a TCPLib.Server object or another TCPLib.TCPClient object
     """
 
-    def __init__(self, host: str = None, port: int = None, timeout: int = None):
+    def __init__(self, timeout: int = None):
         self._soc = None
-        self._addr = (host, port)
+        self._listen_soc = None
+        self._remote_addr = (None, None)
+        self._host_addr = (None, None)
         self._timeout = timeout
         self._is_connected = False
+        self._is_host = False
 
     @classmethod
     def from_socket(cls, soc: socket.socket):
         """
-        Allows for a client to be created from a socket object.
-        The socket must be initialized and connected.
+        Allows for a client to be created from a socket object. The socket must be initialized and connected.
         """
-        out = cls(None, None, soc.gettimeout())
+        out = cls(soc.gettimeout())
         out._soc = soc
-        out._addr = soc.getpeername()
+        try:
+            out._host_addr = soc.getpeername()
+        except OSError:  # Not connected
+            return out
         out._is_connected = True
         return out
 
@@ -47,13 +47,16 @@ class TCPClient:
         if self._soc is not None:
             self._soc.close()
             self._soc = None
+        if self._listen_soc is not None:
+            self._listen_soc.close()
+            self._listen_soc = None
+        self._remote_addr = (None, None)
+        self._host_addr = (None, None)
         self._is_connected = False
+        self._is_host = False
 
     @property
     def is_connected(self) -> bool:
-        """
-        Returns a boolean flag indicating whether the client is connected
-        """
         return self._is_connected
 
     @is_connected.setter
@@ -62,19 +65,10 @@ class TCPClient:
 
     @property
     def timeout(self) -> int | None:
-        """
-        Returns an integer representing the current timeout value.
-        """
         return self._timeout
 
     @timeout.setter
     def timeout(self, timeout: int):
-        """
-        Sets how long the client will wait for messages from the server (in seconds). The Timeout argument should be
-        a positive integer. Setting to zero will cause network operations to fail if no data is received immediately.
-        Passing 'None' will set the timeout to infinity.
-        https://docs.python.org/3/library/socket.html#socket-timeouts for more information about timeouts.
-        """
         if timeout is not None:
             if timeout < 0:
                 raise ValueError("Value for timeout should be a positive integer")
@@ -83,41 +77,78 @@ class TCPClient:
             self._soc.settimeout(self._timeout)
 
     @property
-    def addr(self) -> tuple[str, int]:
-        """
-        Returns a tuple with the host's ip (str) and the port (int)
-        """
-        return self._addr
+    def host_addr(self) -> tuple[str | None, int | None]:
+        return self._host_addr
 
-    @addr.setter
-    def addr(self, value: tuple[str, int]):
+    @host_addr.setter
+    def host_addr(self, value):
+        return
+
+    @property
+    def remote_addr(self) -> tuple[str | None, int | None]:
+        return self._remote_addr
+
+    @remote_addr.setter
+    def remote_addr(self, value):
+        return
+
+    @property
+    def is_host(self):
+        return self._is_host
+
+    @is_host.setter
+    def is_host(self, value):
+        return
+
+    def host_single_client(self, addr: tuple[int, str], timeout: int = None):
         """
-        Allows for the address to be changed after class creation. If the server is running, this function will do
-        nothing.
+        Hosts a single connection from another TCP/IP client. The timeout argument sets how long this
+        method will listen for a connection. Raises TimeoutError, ConnectionError, and socket.gaierror.
         """
         if self._is_connected:
             return
-        self._addr = value
-
-    def connect(self) -> bool:
-        """
-        Initiates a connection to the server. Raises TimeoutError, ConnectionError, and socket.gaierror.
-        Returns False if server object refused the connection and True if the connection was
-        accepted.
-        """
-        if self._addr == (None, None):
-            raise NoAddressSupplied("TCPClient was not given an address to connect to. Either pass it to __init__() or "
-                                    "call set_addr()")
-        if self._is_connected:
-            return False
-        self._soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._soc.settimeout(self._timeout)
-
-        logger.info("Attempting to connect to %s @ %d", self._addr[0], self._addr[1])
+        self._listen_soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._listen_soc.settimeout(timeout)
+        self._listen_soc.bind(addr)
         try:
-            self._soc.connect(self._addr)
-            size = decode_header(self._soc.recv(4))
-            msg = self._soc.recv(size)
+            self._listen_soc.listen()
+            client_soc, client_addr = self._listen_soc.accept()
+            self._soc = client_soc
+            self._remote_addr = client_addr
+            self._is_connected = True
+            self._is_host = True
+            logger.info("Accepted Connection from %s @ %d", client_addr[0], client_addr[1])
+        except TimeoutError as e:
+            self._clean_up()
+            raise e
+        except ConnectionError as e:
+            self._clean_up()
+            raise e
+        except socket.gaierror as e:
+            self._clean_up()
+            raise e
+        except OSError as e:
+            self._clean_up()
+            raise e
+        self._listen_soc.close()
+        self._listen_soc = None
+        return
+
+    def connect(self, addr: tuple[str, int]):
+        """
+        Initiates a connection to a TCPLib server object. Raises TimeoutError, ConnectionError, and socket.gaierror.
+        """
+        if self._is_connected:
+            return
+        if not self._soc:
+            self._soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._soc.settimeout(self._timeout)
+        self._host_addr = addr
+        logger.info("Attempting to connect to %s @ %d", self._host_addr[0], self._host_addr[1])
+        try:
+            self._soc.connect(self._host_addr)
+            self._is_connected = True
+            self._is_host = False
         except TimeoutError as e:
             self._clean_up()
             raise e
@@ -131,32 +162,18 @@ class TCPClient:
             self._clean_up()
             raise e
 
-        if msg == b'CONNECTION ACCEPTED':
-            self._is_connected = True
-            logger.info("Successfully connected to %s @ %d", self._addr[0], self._addr[1])
-            return True
-        elif msg == b'SERVER FULL':
-            self._clean_up()
-            logger.info("Connection to %s @ %d was denied due to the server being full",
-                        self._addr[0], self._addr[1])
-            return False
-        else:
-            self._clean_up()
-            logger.error("Unrecognized reply from %s @ %d. Size=%d", self._addr[0], self._addr[1], size)
-            return False
-
     def disconnect(self):
         """
-        Disconnect from the currently connected server. If no connection is opened, this method does nothing.
+        Disconnect from the currently connected host. If no connection is opened, this method does nothing.
         """
         if self._is_connected:
             self._clean_up()
-            logger.info("Disconnected from %s @ %d", self._addr[0], self._addr[1])
+            logger.info("Disconnected from host")
 
     def send_bytes(self, data: bytes):
         """
-        Send all bytes of the data argument WITHOUT a header attached. Returns True on successful transmission,
-        False on failed transmission. Raises TimeoutError, ConnectionError, socket.gaierror, and OSError.
+        Send raw bytes. If attach_header is True, attaches a 4 bytes size header before sending.
+        Raises TimeoutError, ConnectionError, and OSError.
         """
         if not self._is_connected:
             return False
@@ -172,49 +189,38 @@ class TCPClient:
         except ConnectionError as e:
             self._clean_up()
             raise e
-        except socket.gaierror as e:
-            self._clean_up()
-            raise e
         except OSError as e:
             self._clean_up()
             raise e
 
-    def send(self, data: bytes) -> bool:
-        """
-        Send all bytes of the data argument WITH a header attached. Returns True on successful transmission,
-        False on failed transmission. Raises TimeoutError, ConnectionError, socket.gaierror, and OSError.
-        """
+    def send(self, data: bytes):
         return self.send_bytes(encode_msg(data))
 
     def receive_bytes(self, size: int) -> bytes | None:
         """
-        Receive only the number of bytes specified, None if connection was closed prematurely. Raises TimeoutError,
-        ConnectionError, socket.gaierror, and OSError.
+        Receive only the number of bytes specified, returns None if connection was closed prematurely. Raises TimeoutError,
+        ConnectionError, and OSError.
         """
         try:
             data = self._soc.recv(size)
             return data
         except AttributeError:  # Socket was closed from another thread
             self._clean_up()
-            return
         except TimeoutError as e:
             self._clean_up()
             raise e
         except ConnectionError as e:
             self._clean_up()
             raise e
-        except socket.gaierror as e:
-            self._clean_up()
-            raise e
         except OSError as e:
             self._clean_up()
             raise e
 
-    def receive(self, buff_size: int = 4096) -> Generator[bytes | int, None, None]:
+    def iter_receive(self, buff_size: int = 4096) -> Generator[bytes | int, None, None]:
         """
         Returns a generator for iterating over the bytes of an incoming message. An integer representing the message
         size is yielded first. Subsequent calls yield the contents of the message as it is received. Raises
-        TimeoutError, ConnectionError, socket.gaierror, and OSError.
+        TimeoutError, ConnectionError, and OSError.
         """
         if not self._is_connected:
             return
@@ -226,7 +232,7 @@ class TCPClient:
             return
         size = decode_header(header)
         logger.debug("Incoming message from %s @ %d, SIZE=%d",
-                     self._addr[0], self._addr[1], size)
+                     self._host_addr[0], self._host_addr[1], size)
         yield size
         if size < buff_size:
             buff_size = size
@@ -240,26 +246,26 @@ class TCPClient:
                 buff_size = remaining
             yield data
 
-    def receive_all(self, buff_size: int = 4096) -> Message:
+    def receive(self, buff_size: int = 4096) -> bytearray:
         """
-        Receive all the bytes of an incoming message in one, easy method. Raises TimeoutError, ConnectionError,
-        socket.gaierror, and OSError.
+        Receive raw bytes. Returns a bytearray. Raises TimeoutError, ConnectionError, and OSError.
         """
-        msg = Message(None, None)
-        if not self._is_connected:
-            return msg
         data = bytearray()
-        gen = self.receive(buff_size)
+        if not self._is_connected:
+            return data
+        gen = self.iter_receive(buff_size)
         if not gen:
-            return msg
+            return data
         try:
-            msg.size = next(gen)
+            next(gen)
         except StopIteration:
-            return msg
+            return data
         for chunk in gen:
             if not chunk:
-                return msg
+                return data
             data.extend(chunk)
-        msg.data = data
-        logger.debug("Received a total of %d bytes from %s @ %d", len(data), self._addr[0], self._addr[1])
-        return msg
+        if self._host_addr == (None, None):
+            logger.debug("Received a total of %d bytes", len(data))
+        else:
+            logger.debug("Received a total of %d bytes from %s @ %d", len(data), self._host_addr[0], self._host_addr[1])
+        return data

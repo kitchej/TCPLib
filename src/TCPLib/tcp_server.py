@@ -18,23 +18,31 @@ logger = logging.getLogger(__name__)
 
 class TCPServer:
     """
-    Class for creating, maintaining, and transmitting data to multiple client connections. This class can
-    accept and use an external Queue object
+    Creates, maintains, and transmits data to multiple TCPLib.TCPClient connections.
     """
 
-    def __init__(self, host: str = None, port: int = None, max_clients: int = 0, timeout: int = None,
-                 msg_q: queue.Queue = None):
-        self._addr = (host, port)
+    def __init__(self, max_clients: int = 0, timeout: int = None):
+        self._addr = (None, None)
         self._max_clients = max_clients
         self._timeout = timeout
-        if msg_q:
-            self._messages = msg_q
-        else:
-            self._messages = queue.Queue()
+        self._messages = queue.Queue()
         self._soc = None
         self._is_running = False
+        self._is_running_lock = threading.Lock()
         self._connected_clients = {}
         self._connected_clients_lock = threading.Lock()
+
+    @classmethod
+    def from_socket(cls, soc: socket.socket, max_clients: int = 0):
+        """
+        Allows for a server to be created from a socket object. The socket must be initialized and bound to an address.
+        """
+        out = cls(max_clients, soc.gettimeout())
+        out._soc = soc
+        out._addr = soc.getsockname()
+        threading.Thread(target=out._mainloop).start()
+        logger.info("Server has been started")
+        return out
 
     @staticmethod
     def _generate_client_id() -> str:
@@ -59,15 +67,13 @@ class TCPServer:
 
     def _create_soc(self) -> bool:
         self._soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            self._soc.bind(self._addr)
-        except socket.gaierror:
-            logger.exception(f"Exception when trying to bind to %s @ %d", self._addr[0], self._addr[1])
-            return False
-        return True
+        self._soc.bind(self._addr)
+        return
 
     def _mainloop(self):
-        while self.is_running:
+        logger.debug("Server is listening for connections")
+        self._set_is_running(True)
+        while self._get_is_running():
             try:
                 self._soc.listen()
                 client_soc, client_addr = self._soc.accept()
@@ -75,57 +81,58 @@ class TCPServer:
                 if self.is_full:
                     logger.warning("%s @ %d was denied connection due to server being full",
                                    client_addr[0], client_addr[1])
-                    client_soc.sendall(encode_msg(b'SERVER FULL'))
                     client_soc.close()
                     continue
-                client_soc.sendall(encode_msg(b'CONNECTION ACCEPTED'))
                 self._start_client_proc(self._generate_client_id(), client_soc)
-            except OSError:
-                logger.exception(f"Exception occurred while listening on %s @ %d", self._addr[0], self._addr[1])
+            except ConnectionError:
+                continue
+            except TimeoutError:
+                continue
+            except AttributeError:  # Socket was closed from another thread
+                self.stop()
                 break
-
-    def _on_connect(self, *args, **kwargs):
-        """
-        Overridable method that runs once the client is connected. Returning 'False' from this method will
-        disconnect the client and abort client setup.
-        """
-        pass
+            except OSError:
+                self.stop()
+                break
+        logger.debug("Server is no longer listening for messages")
 
     def _start_client_proc(self, client_id: str, client_soc: socket.socket):
-        result = self._on_connect(client_soc, client_id)
-        if result is False:
-            client_soc.close()
-            return
         client_proc = ClientProcessor(client_id=client_id,
                                       client_soc=client_soc,
                                       msg_q=self._messages,
-                                      server_obj=self,
                                       timeout=self._timeout)
+        client_proc.start()
         self._update_connected_clients(client_proc.id, client_proc)
+
+    def _get_is_running(self):
+        self._is_running_lock.acquire()
+        running = self._is_running
+        self._is_running_lock.release()
+        return running
+
+    def _set_is_running(self, value):
+        self._is_running_lock.acquire()
+        self._is_running = value
+        self._is_running_lock.release()
+
 
     @property
     def addr(self) -> tuple[str, int]:
         """
-        Returns a tuple with the current ip (str) and the port (int) the server is listening on.
+        Returns a tuple with the current address the server is listening on.
         """
         return self._addr
 
     @addr.setter
-    def addr(self, value: tuple[str, int]):
-        """
-        Allows for the address to be changed after class creation. If the server is running, this function will do
-        nothing.
-        """
-        if self._is_running:
-            return
-        self._addr = value
+    def addr(self, value):
+        return
 
     @property
     def is_running(self) -> bool:
         """
         Returns a boolean indicating whether the server is set up and running
         """
-        return self._is_running
+        return self._get_is_running()
 
     @is_running.setter
     def is_running(self, value):
@@ -204,19 +211,16 @@ class TCPServer:
         See https://docs.python.org/3/library/socket.html#socket-timeouts for more information about timeouts.
         """
         if timeout is None:
-            pass
+            return
         elif timeout < 0:
-            return False
+            return
         for client_id in self.list_clients():
             client_proc = self._get_client(client_id)
-            result = client_proc.timeout = timeout
-            if not result:
-                return False
-        return True
+            client_proc.timeout = timeout
 
     def list_clients(self) -> list:
         """
-        Returns a list of with the client ids of all connected clients
+        Returns a list with the client ids of all connected clients
         """
         self._connected_clients_lock.acquire()
         client_list = self._connected_clients.keys()
@@ -235,7 +239,7 @@ class TCPServer:
         return {
             "is_running": client.is_running,
             "timeout": client.timeout,
-            "addr": client.addr,
+            "addr": client.remote_addr,
         }
 
     def disconnect_client(self, client_id: str) -> bool:
@@ -269,7 +273,7 @@ class TCPServer:
 
     def get_all_msg(self, block: bool = False, timeout: int = None) -> Generator[Message | None, None, None]:
         """
-        Generator for iterating over the queue. If block is True, each iteration of this method will block until it
+        Generator for iterating over the message queue. If block is True, each iteration of this method will block until it
         can pop something from the queue, else it will try to get a value and yield None if queue is empty. If block
         is True and a timeout is given, block until timeout expires and then yield None if no item was received. See
         https://docs.python.org/3/library/queue.html#queue.Queue.get for more information
@@ -279,14 +283,14 @@ class TCPServer:
 
     def has_messages(self) -> bool:
         """
-        Returns a boolean flag indicating whether the queue has messages in it or not
+        Returns a boolean flag indicating if the message queue has any messages
         """
         return not self._messages.empty()
 
     def send(self, client_id: str, data: bytes) -> bool:
         """
-        Sends data to a connected client. Data should be a bytes-like object. Returns True on successful sending,
-        False if not or if a client with client_id could not be found.
+        Sends data to a connected client. Returns True on successful sending, False if not or if a client with
+        client_id could not be found.
         """
         self._connected_clients_lock.acquire()
         try:
@@ -297,24 +301,23 @@ class TCPServer:
         self._connected_clients_lock.release()
         return client.send(data)
 
-    def start(self) -> bool:
+    def start(self, addr: tuple[str, int]):
         """
-        Starts the server. Returns True on successful start up, False if not.
+        Starts the server and connects to the address provided.
         """
-        if self._is_running:
-            return False
-        if not self._create_soc():
-            return False
-        self._is_running = True
-        threading.Thread(target=self._mainloop, daemon=True).start()
+
+        if self._get_is_running():
+            return
+        self._addr = addr
+        self._create_soc()
+        threading.Thread(target=self._mainloop).start()
         logger.info("Server has been started")
-        return True
 
     def stop(self):
         """
         Stops the server. If the server is not running, this method will do nothing.
         """
-        if self._is_running:
+        if self._get_is_running():
             self._connected_clients_lock.acquire()
             for client in self._connected_clients.values():
                 client.stop()
@@ -322,5 +325,6 @@ class TCPServer:
             self._connected_clients_lock.release()
             self._soc.close()
             self._soc = None
-            self._is_running = False
+            self._set_is_running(False)
+            self._addr = (None, None)
             logger.info("Server has been stopped")

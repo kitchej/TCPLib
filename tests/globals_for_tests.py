@@ -3,6 +3,7 @@ import shutil
 
 HOST = "127.0.0.1"
 PORT = 5000
+DUMMY_ID = "client1"
 
 
 def setup_log_folder(folder_name):
