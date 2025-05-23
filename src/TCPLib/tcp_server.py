@@ -28,8 +28,21 @@ class TCPServer:
         self._messages = queue.Queue()
         self._soc = None
         self._is_running = False
+        self._is_running_lock = threading.Lock()
         self._connected_clients = {}
         self._connected_clients_lock = threading.Lock()
+
+    @classmethod
+    def from_socket(cls, soc: socket.socket, max_clients: int = 0):
+        """
+        Allows for a server to be created from a socket object. The socket must be initialized and bound to an address.
+        """
+        out = cls(max_clients, soc.gettimeout())
+        out._soc = soc
+        out._addr = soc.getsockname()
+        threading.Thread(target=out._mainloop).start()
+        logger.info("Server has been started")
+        return out
 
     @staticmethod
     def _generate_client_id() -> str:
@@ -54,17 +67,13 @@ class TCPServer:
 
     def _create_soc(self) -> bool:
         self._soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            self._soc.bind(self._addr)
-        except socket.gaierror:
-            logger.exception(f"Exception when trying to bind to %s @ %d", self._addr[0], self._addr[1])
-            return False
-        return True
+        self._soc.bind(self._addr)
+        return
 
     def _mainloop(self):
         logger.debug("Server is listening for connections")
-        self._is_running = True
-        while self.is_running:
+        self._set_is_running(True)
+        while self._get_is_running():
             try:
                 self._soc.listen()
                 client_soc, client_addr = self._soc.accept()
@@ -75,10 +84,15 @@ class TCPServer:
                     client_soc.close()
                     continue
                 self._start_client_proc(self._generate_client_id(), client_soc)
-            except Exception:
-                if self._soc is None:
-                    break
-                logger.exception(f"Exception occurred while listening on %s @ %d", self._addr[0], self._addr[1])
+            except ConnectionError:
+                continue
+            except TimeoutError:
+                continue
+            except AttributeError:  # Socket was closed from another thread
+                self.stop()
+                break
+            except OSError:
+                self.stop()
                 break
         logger.debug("Server is no longer listening for messages")
 
@@ -89,6 +103,17 @@ class TCPServer:
                                       timeout=self._timeout)
         client_proc.start()
         self._update_connected_clients(client_proc.id, client_proc)
+
+    def _get_is_running(self):
+        self._is_running_lock.acquire()
+        running = self._is_running
+        self._is_running_lock.release()
+        return running
+
+    def _set_is_running(self, value):
+        self._is_running_lock.acquire()
+        self._is_running = value
+        self._is_running_lock.release()
 
 
     @property
@@ -107,7 +132,7 @@ class TCPServer:
         """
         Returns a boolean indicating whether the server is set up and running
         """
-        return self._is_running
+        return self._get_is_running()
 
     @is_running.setter
     def is_running(self, value):
@@ -279,15 +304,12 @@ class TCPServer:
     def start(self, addr: tuple[str, int]):
         """
         Starts the server and connects to the address provided.
-        Returns True on successful start up, False if not.
         """
 
-        if self._is_running:
-            return False
-
+        if self._get_is_running():
+            return
         self._addr = addr
-        if not self._create_soc():
-            return False
+        self._create_soc()
         threading.Thread(target=self._mainloop).start()
         logger.info("Server has been started")
 
@@ -295,7 +317,7 @@ class TCPServer:
         """
         Stops the server. If the server is not running, this method will do nothing.
         """
-        if self._is_running:
+        if self._get_is_running():
             self._connected_clients_lock.acquire()
             for client in self._connected_clients.values():
                 client.stop()
@@ -303,6 +325,6 @@ class TCPServer:
             self._connected_clients_lock.release()
             self._soc.close()
             self._soc = None
-            self._is_running = False
+            self._set_is_running(False)
             self._addr = (None, None)
             logger.info("Server has been stopped")

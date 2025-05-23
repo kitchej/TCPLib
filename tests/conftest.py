@@ -44,15 +44,6 @@ def setup_log_folder(folder_name):
         os.mkdir(log_folder)
     return log_folder
 
-@pytest.fixture
-def error_client(request):
-    soc = dummy_soc.SocRaiseErr(excep=request.param[0], func_to_fail=request.param[1])
-    soc.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    c = TCPClient.from_socket(soc)
-    yield c
-    if c._soc is not None:
-        c._soc.close()
-
 
 @pytest.fixture
 def dummy_server():
@@ -69,6 +60,20 @@ def dummy_client():
     yield c
     c.close()
 
+@pytest.fixture
+def client():
+    c = TCPClient()
+    yield c
+    c.disconnect()
+
+
+@pytest.fixture
+def client_list(request):
+    num_clients = request.param
+    clients = [TCPClient() for _ in range(num_clients)]
+    yield clients
+    for client in clients:
+        client.disconnect()
 
 @pytest.fixture
 def server():
@@ -87,6 +92,14 @@ def client_processor(dummy_client, dummy_server):
     dummy_client.close()
     dummy_server.stop()
 
+@pytest.fixture
+def error_client(request):
+    soc = dummy_soc.SocRaiseErr(excep=request.param[0], func_to_fail=request.param[1])
+    soc.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    c = TCPClient.from_socket(soc)
+    yield c
+    c.disconnect()
+
 
 @pytest.fixture
 def error_client_processor(request, dummy_server):
@@ -102,16 +115,11 @@ def error_client_processor(request, dummy_server):
 
 
 @pytest.fixture
-def client():
-    c = TCPClient()
-    yield c
-    c.disconnect()
+def error_server(request):
+    soc = dummy_soc.SocRaiseErr(excep=request.param[0], func_to_fail=request.param[1])
+    soc.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    soc.bind((HOST, PORT))
+    s = TCPServer.from_socket(soc)
+    yield s
+    s.stop()
 
-
-@pytest.fixture
-def client_list(request):
-    num_clients = request.param
-    clients = [TCPClient() for _ in range(num_clients)]
-    yield clients
-    for client in clients:
-        client.disconnect()

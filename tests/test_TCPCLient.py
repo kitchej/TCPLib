@@ -25,6 +25,7 @@ class TestTCPClient:
         assert c._host_addr == (None, None)
         assert c._timeout is None
         assert c._is_connected is False
+        assert c._is_host is False
 
     @staticmethod
     def assert_excep_raised_on_connect(c, excep):
@@ -66,6 +67,7 @@ class TestTCPClient:
         assert client._host_addr == (HOST, PORT)
         assert client._timeout is None
         assert client._is_connected is True
+        assert client._is_host is False
 
         assert client.is_connected
         client.is_connected = False
@@ -81,8 +83,11 @@ class TestTCPClient:
         client.host_addr = ("192.168.010", 6000)
         assert client.host_addr == (HOST, PORT)
 
-        client.disconnect()
+        assert client.is_host is False
+        client.is_host = True
+        assert client.is_host is False
 
+        client.disconnect()
         self.assert_default_state(client)
 
     def test_from_socket(self, dummy_server):
@@ -101,6 +106,7 @@ class TestTCPClient:
         assert c._host_addr == (HOST, PORT)
         assert c._timeout is None
         assert c._is_connected is True
+        assert c._is_host is False
 
         c.disconnect()
 
@@ -127,12 +133,12 @@ class TestTCPClient:
         assert client._host_addr == (None, None)
         assert client._timeout is None
         assert client._is_connected is True
+        assert client._is_host is True
 
         client.disconnect()
-
         self.assert_default_state(client)
 
-    # Test exceptions in connect()
+    """Test exceptions in TCPClient.connect()"""
 
     @pytest.mark.parametrize('error_client', [(TimeoutError, "connect")], indirect=True)
     def test_connect_timeout_error(self, error_client):
@@ -174,7 +180,7 @@ class TestTCPClient:
         self.assert_excep_raised_on_connect(error_client, error_client._soc.excep)
         self.assert_default_state(error_client)
 
-    # Test exceptions in send()
+    """Test exceptions in TCPClient.send()"""
 
     @pytest.mark.parametrize('error_client', [(AttributeError, "sendall")], indirect=True)
     def test_send_attribute_error(self, error_client, dummy_server):
@@ -212,18 +218,6 @@ class TestTCPClient:
         self.assert_excep_raised_on_send(error_client, error_client._soc.excep)
         self.assert_default_state(error_client)
 
-    @pytest.mark.parametrize('error_client', [(socket.gaierror, "sendall")], indirect=True)
-    def test_send_gai_error(self, error_client, dummy_server):
-        add_file_handler(logger,
-                         os.path.join(log_folder, "test_send_gai_error.log"),
-                         logging.DEBUG,
-                         "test_send_gai_error-filehandler")
-
-        dummy_server.start()
-
-        self.assert_excep_raised_on_send(error_client, error_client._soc.excep)
-        self.assert_default_state(error_client)
-
     @pytest.mark.parametrize('error_client', [(OSError, "sendall")], indirect=True)
     def test_send_os_error(self, error_client, dummy_server):
         add_file_handler(logger,
@@ -235,9 +229,6 @@ class TestTCPClient:
 
         self.assert_excep_raised_on_send(error_client, error_client._soc.excep)
         self.assert_default_state(error_client)
-
-    # Test exceptions in receive()
-    # Also tests iter_receive() and _receive_chunk() since receive() calls both
 
     @pytest.mark.parametrize('error_client', [(AttributeError, "recv")], indirect=True)
     def test_recv_attribute_error(self, error_client, dummy_server):
@@ -275,18 +266,6 @@ class TestTCPClient:
         self.assert_excep_raised_on_recv(error_client, error_client._soc.excep)
         self.assert_default_state(error_client)
 
-    @pytest.mark.parametrize('error_client', [(socket.gaierror, "recv")], indirect=True)
-    def test_recv_gai_error(self, error_client, dummy_server):
-        add_file_handler(logger,
-                         os.path.join(log_folder, "test_recv_gai_error.log"),
-                         logging.DEBUG,
-                         "test_recv_gai_error-filehandler")
-
-        dummy_server.start()
-
-        self.assert_excep_raised_on_recv(error_client, error_client._soc.excep)
-        self.assert_default_state(error_client)
-
     @pytest.mark.parametrize('error_client', [(OSError, "recv")], indirect=True)
     def test_recv_os_error(self, error_client, dummy_server):
         add_file_handler(logger,
@@ -299,7 +278,7 @@ class TestTCPClient:
         self.assert_excep_raised_on_recv(error_client, error_client._soc.excep)
         self.assert_default_state(error_client)
 
-    # Test send/recv functionality
+    """Test send/recv functionality"""
 
     def test_send(self, client, dummy_server):
         add_file_handler(logger,
@@ -345,12 +324,12 @@ class TestTCPClient:
 
         dummy_server.send(b"Hello World!")
         time.sleep(0.1)
-        data = client._receive_chunk(4)
+        data = client.receive_bytes(4)
         assert len(data) == 4
 
         dummy_server.send(b"Hello World!")
         time.sleep(0.1)
-        data = client._receive_chunk(12)
+        data = client.receive_bytes(12)
         assert len(data) == 12
 
     def test_iter_receive(self, client, dummy_server):
@@ -424,10 +403,3 @@ class TestTCPClient:
         dummy_server.send(encode_msg(video))
         time.sleep(0.1)
         assert client.receive() == video
-
-
-
-
-
-
-

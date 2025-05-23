@@ -9,7 +9,7 @@ class ConfigurableClient:
         self.soc.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.host_addr = (host, port)
 
-    def send(self, data: bytes, bandwith=0, latency=0):
+    def send(self, data: bytes):
         self.soc.sendall(data)
 
     def connect(self):
@@ -56,6 +56,8 @@ class SocRaiseErr(socket.socket):
         - excep = Exception to be raised
         - func_to_fail = Method to raise exception in
             Valid values are:
+            - accept
+            - listen
             - connect
             - sendall
             - recv
@@ -73,6 +75,20 @@ class SocRaiseErr(socket.socket):
         except KeyError:
             self.func_to_fail = None
         super().__init__(*args, **kwargs)
+
+    def listen(self, backlog=..., /):
+        if self.func_to_fail == 'listen':
+            if self.excep:
+                raise self.excep
+        if backlog is ...:
+            backlog = 0
+        super().listen(backlog)
+
+    def accept(self):
+        if self.func_to_fail == 'accept':
+            if self.excep:
+                raise self.excep
+        super().accept()
 
     def connect(self, address, /):
         if self.func_to_fail == 'connect':

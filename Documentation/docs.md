@@ -43,12 +43,12 @@ A boolean indicating whether the server is set up and running. Read only.
 
 
 * **max_clients:** 
-An positive int representing the maximum allowed connections. Zero indicates that the server will allow infinite.
+An positive integer representing the maximum allowed connections. Zero indicates that the server will allow infinite
 connections.
 
 
 * **timeout:** 
-A positive int representing the amount of time the server will wait on a connection. A value of None indicates an infinite timeout.
+A positive integer representing the amount of time the server will wait on a connection. A value of None indicates an infinite timeout.
 
 
 * **client_count:** 
@@ -56,7 +56,7 @@ An int representing the number of connected clients. Read only.
 
 
 * **is_full:** 
-A boolean flag indicating if the server is full. Read only.
+A boolean indicating if the server is full. Read only.
 
 
 * **client_count:** 
@@ -100,7 +100,7 @@ An int representing the number of connected clients. Read only.
 
 * **has_messages()**
 
-    Returns a boolean flag indicating if the message queue has any messages.
+    Returns a boolean indicating if the message queue has any messages.
 
 
 * **send(client_id: ```str```, data: ```bytes```)**
@@ -127,7 +127,7 @@ A TCP client that can connect to a TCP/IP host
 
 
 * **is_connected:** 
-A boolean flag indicating whether the client is connected. Read only.
+A boolean indicating if the client is connected. Read only.
 
 
 * **timeout:** 
@@ -139,7 +139,10 @@ Returns a tuple with the host connection's address. Read only.
 
 
 * **remote_addr:** 
-Returns a tuple with this client's current address. Read only. .
+Returns a tuple with the remote connection's address. Read only.
+
+* **is_host:** 
+Returns a boolean indicating if this client is the host. Read only.
 
 
 ### **Methods**
@@ -163,17 +166,15 @@ Returns a tuple with this client's current address. Read only. .
 
 * **send(data: ```bytes```)**
 
-    Send raw bytes. Attaches a 4 bytes size header before sending. Returns True on successful
-    transmission, False on failed transmission. Raises TimeoutError, ConnectionError, socket.gaierror, and OSError.
+    Send raw bytes. Attaches a 4 bytes size header before sending. Raises TimeoutError, ConnectionError, and OSError.
 
 
 * **iter_receive(buff_size: ```int``` = 4096)**
 
     Returns a generator for iterating over the bytes of an incoming message. An integer representing the message
     size is yielded first. Subsequent calls yield the contents of the message as it is received. Raises
-    TimeoutError, ConnectionError, socket.gaierror, and OSError.
+    TimeoutError, ConnectionError, and OSError.
 
 * **receive()**
 
-    Receive raw bytes. Returns a bytearray. Raises TimeoutError, ConnectionError,
-    socket.gaierror, and OSError.
+    Receive raw bytes. Returns a bytearray. Raises TimeoutError, ConnectionError, and OSError.

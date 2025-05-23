@@ -27,12 +27,12 @@ class TCPClient:
         self._host_addr = (None, None)
         self._timeout = timeout
         self._is_connected = False
+        self._is_host = False
 
     @classmethod
     def from_socket(cls, soc: socket.socket):
         """
-        Allows for a client to be created from a socket object.
-        The socket must be initialized and connected.
+        Allows for a client to be created from a socket object. The socket must be initialized and connected.
         """
         out = cls(soc.gettimeout())
         out._soc = soc
@@ -53,34 +53,10 @@ class TCPClient:
         self._remote_addr = (None, None)
         self._host_addr = (None, None)
         self._is_connected = False
-
-    def _receive_chunk(self, size: int) -> bytes | None:
-        # Receive only the number of bytes specified, None if connection was closed prematurely. Raises TimeoutError,
-        # ConnectionError, socket.gaierror, and OSError.
-        try:
-            data = self._soc.recv(size)
-            return data
-        except AttributeError:  # Socket was closed from another thread
-            self._clean_up()
-            return
-        except TimeoutError as e:
-            self._clean_up()
-            raise e
-        except ConnectionError as e:
-            self._clean_up()
-            raise e
-        except socket.gaierror as e:
-            self._clean_up()
-            raise e
-        except OSError as e:
-            self._clean_up()
-            raise e
+        self._is_host = False
 
     @property
     def is_connected(self) -> bool:
-        """
-        Returns a boolean flag indicating whether the client is connected
-        """
         return self._is_connected
 
     @is_connected.setter
@@ -89,19 +65,10 @@ class TCPClient:
 
     @property
     def timeout(self) -> int | None:
-        """
-        Returns an integer representing the current timeout value.
-        """
         return self._timeout
 
     @timeout.setter
     def timeout(self, timeout: int):
-        """
-        Sets how long the client will wait for messages from the server (in seconds). The Timeout argument should be
-        a positive integer. Setting to zero will cause network operations to fail if no data is received immediately.
-        Passing 'None' will set the timeout to infinity.
-        https://docs.python.org/3/library/socket.html#socket-timeouts for more information about timeouts.
-        """
         if timeout is not None:
             if timeout < 0:
                 raise ValueError("Value for timeout should be a positive integer")
@@ -111,9 +78,6 @@ class TCPClient:
 
     @property
     def host_addr(self) -> tuple[str | None, int | None]:
-        """
-        Returns a tuple with the host's address
-        """
         return self._host_addr
 
     @host_addr.setter
@@ -122,13 +86,18 @@ class TCPClient:
 
     @property
     def remote_addr(self) -> tuple[str | None, int | None]:
-        """
-        Returns a tuple with the remote client's address
-        """
         return self._remote_addr
 
     @remote_addr.setter
     def remote_addr(self, value):
+        return
+
+    @property
+    def is_host(self):
+        return self._is_host
+
+    @is_host.setter
+    def is_host(self, value):
         return
 
     def host_single_client(self, addr: tuple[int, str], timeout: int = None):
@@ -147,6 +116,7 @@ class TCPClient:
             self._soc = client_soc
             self._remote_addr = client_addr
             self._is_connected = True
+            self._is_host = True
             logger.info("Accepted Connection from %s @ %d", client_addr[0], client_addr[1])
         except TimeoutError as e:
             self._clean_up()
@@ -178,6 +148,7 @@ class TCPClient:
         try:
             self._soc.connect(self._host_addr)
             self._is_connected = True
+            self._is_host = False
         except TimeoutError as e:
             self._clean_up()
             raise e
@@ -199,15 +170,15 @@ class TCPClient:
             self._clean_up()
             logger.info("Disconnected from host")
 
-    def send(self, data: bytes):
+    def send_bytes(self, data: bytes):
         """
-        Send raw bytes. Attaches a 4 bytes size header before sending. Returns True on successful
-        transmission, False on failed transmission. Raises TimeoutError, ConnectionError, socket.gaierror, and OSError.
+        Send raw bytes. If attach_header is True, attaches a 4 bytes size header before sending.
+        Raises TimeoutError, ConnectionError, and OSError.
         """
         if not self._is_connected:
             return False
         try:
-            self._soc.sendall(encode_msg(data))
+            self._soc.sendall(data)
             return True
         except AttributeError:  # Socket was closed from another thread
             self._clean_up()
@@ -218,7 +189,27 @@ class TCPClient:
         except ConnectionError as e:
             self._clean_up()
             raise e
-        except socket.gaierror as e:
+        except OSError as e:
+            self._clean_up()
+            raise e
+
+    def send(self, data: bytes):
+        return self.send_bytes(encode_msg(data))
+
+    def receive_bytes(self, size: int) -> bytes | None:
+        """
+        Receive only the number of bytes specified, returns None if connection was closed prematurely. Raises TimeoutError,
+        ConnectionError, and OSError.
+        """
+        try:
+            data = self._soc.recv(size)
+            return data
+        except AttributeError:  # Socket was closed from another thread
+            self._clean_up()
+        except TimeoutError as e:
+            self._clean_up()
+            raise e
+        except ConnectionError as e:
             self._clean_up()
             raise e
         except OSError as e:
@@ -229,14 +220,14 @@ class TCPClient:
         """
         Returns a generator for iterating over the bytes of an incoming message. An integer representing the message
         size is yielded first. Subsequent calls yield the contents of the message as it is received. Raises
-        TimeoutError, ConnectionError, socket.gaierror, and OSError.
+        TimeoutError, ConnectionError, and OSError.
         """
         if not self._is_connected:
             return
         if buff_size <= 0:
             raise NegativeBufferValue("Argument buff_size must be a non-zero, positive integer")
         bytes_recv = 0
-        header = self._receive_chunk(4)
+        header = self.receive_bytes(4)
         if not header:  # Socket was closed from another thread
             return
         size = decode_header(header)
@@ -246,7 +237,7 @@ class TCPClient:
         if size < buff_size:
             buff_size = size
         while bytes_recv < size:
-            data = self._receive_chunk(buff_size)
+            data = self.receive_bytes(buff_size)
             if not data:  # Socket was closed from another thread
                 return
             bytes_recv += len(data)
@@ -257,8 +248,7 @@ class TCPClient:
 
     def receive(self, buff_size: int = 4096) -> bytearray:
         """
-        Receive raw bytes. Returns a bytearray. Raises TimeoutError, ConnectionError,
-        socket.gaierror, and OSError.
+        Receive raw bytes. Returns a bytearray. Raises TimeoutError, ConnectionError, and OSError.
         """
         data = bytearray()
         if not self._is_connected:
