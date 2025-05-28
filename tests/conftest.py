@@ -63,7 +63,6 @@ def dummy_client():
 @pytest.fixture
 def client():
     c = TCPClient()
-    c._soc.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     yield c
     c.disconnect()
 
@@ -72,8 +71,6 @@ def client():
 def client_list(request):
     num_clients = request.param
     clients = [TCPClient() for _ in range(num_clients)]
-    for c in clients:
-        c._soc.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     yield clients
     for client in clients:
         client.disconnect()
@@ -81,7 +78,6 @@ def client_list(request):
 @pytest.fixture
 def server():
     s = TCPServer()
-    s._soc.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     yield s
     s.stop()
 

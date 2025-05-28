@@ -142,6 +142,7 @@ class TCPClient:
             return
         if not self._soc:
             self._soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._soc.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self._soc.settimeout(self._timeout)
         self._host_addr = addr
         logger.info("Attempting to connect to %s @ %d", self._host_addr[0], self._host_addr[1])

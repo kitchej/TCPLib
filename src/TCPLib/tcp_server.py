@@ -67,6 +67,7 @@ class TCPServer:
 
     def _create_soc(self) -> bool:
         self._soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._soc.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self._soc.bind(self._addr)
         return
 
