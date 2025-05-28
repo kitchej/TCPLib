@@ -50,7 +50,7 @@ class TCPServer:
         client_id = int(client_id, base=36)
         return str(client_id)
 
-    def _get_client(self, client_id: str) -> ClientProcessor | None:
+    def _get_client(self, client_id: str) -> ClientProcessor:
         self._connected_clients_lock.acquire()
         try:
             client = self._connected_clients[client_id]
@@ -282,7 +282,7 @@ class TCPServer:
         except queue.Empty:
             return None
 
-    def get_all_msg(self, block: bool = False, timeout: int = None) -> Generator[Message | None, None, None]:
+    def get_all_msg(self, block: bool = False, timeout: int = None) -> Generator:
         """
         Generator for iterating over the message queue. If block is True, each iteration of this method will block until it
         can pop something from the queue, else it will try to get a value and yield None if queue is empty. If block

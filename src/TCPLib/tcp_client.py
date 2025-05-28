@@ -216,7 +216,7 @@ class TCPClient:
             self._clean_up()
             raise e
 
-    def iter_receive(self, buff_size: int = 4096) -> Generator[bytes | int, None, None]:
+    def iter_receive(self, buff_size: int = 4096) -> Generator:
         """
         Returns a generator for iterating over the bytes of an incoming message. An integer representing the message
         size is yielded first. Subsequent calls yield the contents of the message as it is received. Raises
