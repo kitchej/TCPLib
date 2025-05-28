@@ -172,8 +172,7 @@ class TCPClient:
 
     def send_bytes(self, data: bytes):
         """
-        Send raw bytes. If attach_header is True, attaches a 4 bytes size header before sending.
-        Raises TimeoutError, ConnectionError, and OSError.
+        Send raw bytes. Raises TimeoutError, ConnectionError, and OSError.
         """
         if not self._is_connected:
             return False
