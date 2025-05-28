@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 class TCPServer:
     """
-    Creates, maintains, and transmits data to multiple TCPLib.TCPClient connections.
+    Creates, maintains, and transmits data to multiple TCP/IP connections.
     """
 
     def __init__(self, max_clients: int = 0, timeout: int = None):
@@ -33,7 +33,7 @@ class TCPServer:
         self._connected_clients_lock = threading.Lock()
 
     @classmethod
-    def from_socket(cls, soc: socket.socket, max_clients: int = 0):
+    def from_socket(cls, soc: socket.socket, max_clients: int = 0) -> "TCPServer":
         """
         Allows for a server to be created from a socket object. The socket must be initialized and bound to an address.
         """

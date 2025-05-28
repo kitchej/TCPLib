@@ -17,7 +17,7 @@ class NegativeBufferValue(Exception):
 
 class TCPClient:
     """
-    A simple TCP client for connecting to a TCPLib.Server object or another TCPLib.TCPClient object
+    A simple TCP client that can connect to a TCP/IP host
     """
 
     def __init__(self, timeout: int = None):
@@ -30,9 +30,10 @@ class TCPClient:
         self._is_host = False
 
     @classmethod
-    def from_socket(cls, soc: socket.socket):
+    def from_socket(cls, soc: socket.socket) -> "TCPClient":
         """
-        Allows for a client to be created from a socket object. The socket must be initialized and connected.
+        Allows for a client to be created from a socket object. The socket must be initialized and connected. Returns
+        a new TCPClient object.
         """
         out = cls(soc.gettimeout())
         out._soc = soc
@@ -102,7 +103,7 @@ class TCPClient:
 
     def host_single_client(self, addr: tuple[int, str], timeout: int = None):
         """
-        Hosts a single connection from another TCP/IP client. The timeout argument sets how long this
+        Hosts a single connection from a remote TCP/IP connection. The timeout argument sets how long this
         method will listen for a connection. Raises TimeoutError, ConnectionError, and socket.gaierror.
         """
         if self._is_connected:
@@ -136,7 +137,7 @@ class TCPClient:
 
     def connect(self, addr: tuple[str, int]):
         """
-        Initiates a connection to a TCPLib server object. Raises TimeoutError, ConnectionError, and socket.gaierror.
+        Initiates a connection to a TCP/IP host. Raises TimeoutError, ConnectionError, and socket.gaierror.
         """
         if self._is_connected:
             return
@@ -173,7 +174,7 @@ class TCPClient:
 
     def send_bytes(self, data: bytes):
         """
-        Send raw bytes. Raises TimeoutError, ConnectionError, and OSError.
+        Send raw bytes with no size header. Raises TimeoutError, ConnectionError, and OSError.
         """
         if not self._is_connected:
             return False
@@ -194,11 +195,14 @@ class TCPClient:
             raise e
 
     def send(self, data: bytes):
+        """
+        Send raw bytes with a 4 byte size header attached. Raises TimeoutError, ConnectionError, and OSError.
+        """
         return self.send_bytes(encode_msg(data))
 
     def receive_bytes(self, size: int) -> bytes:
         """
-        Receive only the number of bytes specified, returns None if connection was closed prematurely. Raises TimeoutError,
+        Receive only the number of bytes specified. Returns None if connection was closed prematurely. Raises TimeoutError,
         ConnectionError, and OSError.
         """
         try:
@@ -248,7 +252,7 @@ class TCPClient:
 
     def receive(self, buff_size: int = 4096) -> bytearray:
         """
-        Receive raw bytes. Returns a bytearray. Raises TimeoutError, ConnectionError, and OSError.
+        Receive raw bytes. Expects a 4 bytes size header to be attached. Returns a bytearray. Raises TimeoutError, ConnectionError, and OSError.
         """
         data = bytearray()
         if not self._is_connected:

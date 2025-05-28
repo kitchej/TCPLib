@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 class ClientProcessor:
     """
-    Maintains a single client connection for a TCPLib.Server object.
+    Maintains a single TCP/IP client connection.
     """
 
     def __init__(self, client_id, client_soc: socket.socket, msg_q: queue.Queue, buff_size=4096, timeout: int = None):
@@ -42,9 +42,6 @@ class ClientProcessor:
                 self.stop()
                 return
             except ConnectionError:
-                self.stop()
-                return
-            except socket.gaierror:
                 self.stop()
                 return
             except OSError:
@@ -111,7 +108,7 @@ class ClientProcessor:
     def send(self, data: bytes) -> bool:
         """
         Send bytes to the client with a 4 byte header attached. Returns True on successful transmission,
-        False on failed transmission. Raises TimeoutError, ConnectionError, socket.gaierror, and OSError.
+        False on failed transmission. Raises TimeoutError, ConnectionError, and OSError.
         """
         return self._tcp_client.send(data)
 

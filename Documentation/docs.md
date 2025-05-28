@@ -35,34 +35,47 @@ be infinite. If timeout is None, the timeout will be infinite.
 ### **Properties**
 
 * **addr:** 
-A tuple with the current address the server is listening on. Read only.
+
+  A tuple with the current address the server is listening on. Read only.
 
 
 * **is_running:** 
-A boolean indicating whether the server is set up and running. Read only.
+
+  A boolean indicating whether the server is set up and running. Read only.
 
 
 * **max_clients:** 
-An positive integer representing the maximum allowed connections. Zero indicates that the server will allow infinite
-connections.
+
+  An positive integer representing the maximum allowed connections. Zero indicates that the server will allow infinite
+  connections.
 
 
 * **timeout:** 
-A positive integer representing the amount of time the server will wait on a connection. A value of None indicates an infinite timeout.
+
+  A positive integer representing the amount of time the server will wait on a connection. A value of None indicates an infinite timeout.
 
 
-* **client_count:** 
-An int representing the number of connected clients. Read only.
+* **client_count:**
+
+  An int representing the number of connected clients. Read only.
 
 
 * **is_full:** 
-A boolean indicating if the server is full. Read only.
+
+  A boolean indicating if the server is full. Read only.
 
 
 * **client_count:** 
-An int representing the number of connected clients. Read only.
+
+  An int representing the number of connected clients. Read only.
 
 ### **Methods**
+
+* **from_socket(soc: socket.socket, max_clients: int)**
+ 
+    A class method that allows for a TCPServer object to be created from a socket object. The socket must be initialized and bound to an address.
+    Returns a new TCPServer object.
+
 
 * **set_clients_timeout(timeout: ```int```):** 
 
@@ -111,7 +124,7 @@ An int representing the number of connected clients. Read only.
 
 * **start(addr: ```tuple[str, int]```)**
 
-    Starts the server and listens for connections on the address provided. Returns True on successful start up, False if not.
+    Starts the server and listens for connections on the address provided.
 
 
 * **stop(addr: ```tuple[str, int]```)**
@@ -121,7 +134,8 @@ An int representing the number of connected clients. Read only.
 ---
 ## **TCPClient(self, timeout: int = None)**
 
-A TCP client that can connect to a TCP/IP host
+A simple TCP client that can connect to a TCP/IP host
+
 
 ### **Properties**
 
@@ -141,16 +155,22 @@ Returns a tuple with the host connection's address. Read only.
 * **remote_addr:** 
 Returns a tuple with the remote connection's address. Read only.
 
+
 * **is_host:** 
 Returns a boolean indicating if this client is the host. Read only.
 
 
 ### **Methods**
 
+* **from_socket(soc: socket.socket)**
+
+    A class method that allows for a TCPClient object to be created from a socket object. The socket must be initialized and connected. Returns
+    a new TCPClient object.
+
 
 * **host_single_client(addr: ```tuple[str, int]```, timeout: ```int``` = None)**
 
-    Hosts a single connection from another TCP/IP client. The timeout argument sets how long this
+    Hosts a single connection from a remote TCP/IP connection. The timeout argument sets how long this
     method will listen for a connection. Raises TimeoutError, ConnectionError, and socket.gaierror.
 
 
@@ -164,9 +184,20 @@ Returns a boolean indicating if this client is the host. Read only.
     Disconnect from the currently connected host. If no connection is opened, this method does nothing.
 
 
+* **send_bytes(data: ```bytes```)**
+
+    Send raw bytes with no size header. Raises TimeoutError, ConnectionError, and OSError.
+
+
 * **send(data: ```bytes```)**
 
-    Send raw bytes. Attaches a 4 bytes size header before sending. Raises TimeoutError, ConnectionError, and OSError.
+  Send raw bytes with a 4 byte size header attached. Raises TimeoutError, ConnectionError, and OSError.
+
+
+* **receive_bytes(size: int)**
+
+  Receive only the number of bytes specified. Returns None if connection was closed prematurely. Raises TimeoutError,
+  ConnectionError, and OSError.
 
 
 * **iter_receive(buff_size: ```int``` = 4096)**
@@ -175,6 +206,7 @@ Returns a boolean indicating if this client is the host. Read only.
     size is yielded first. Subsequent calls yield the contents of the message as it is received. Raises
     TimeoutError, ConnectionError, and OSError.
 
+
 * **receive()**
 
-    Receive raw bytes. Returns a bytearray. Raises TimeoutError, ConnectionError, and OSError.
+    Receive raw bytes. Expects a 4 bytes size header to be attached. Returns a bytearray. Raises TimeoutError, ConnectionError, and OSError.
