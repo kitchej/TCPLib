@@ -217,6 +217,23 @@ class TestTCPServer:
         msg = client.receive()
         assert msg == b"Hello World!"
 
+    def test_on_connect(self, on_connect_server, client):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_on_connect.log"),
+                         logging.DEBUG,
+                         "test_on_connect-filehandler")
+
+        on_connect_server.start((HOST, PORT))
+        time.sleep(0.1)
+
+        client.connect((HOST, PORT))
+        time.sleep(0.1)
+
+        assert on_connect_server.client_count == 0
+        client.send(b"H")
+        time.sleep(0.1)
+        assert not on_connect_server.has_messages()
+
 
 
 

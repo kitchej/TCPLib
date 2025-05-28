@@ -1,6 +1,15 @@
 import threading
 import time
 import socket
+from TCPLib.tcp_server import TCPServer
+
+
+class OnConnectServer(TCPServer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def on_connect(self, client, client_id):
+        return False
 
 
 class ConfigurableClient:

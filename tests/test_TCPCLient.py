@@ -288,7 +288,7 @@ class TestTCPClient:
 
         msg1 = b"Hello World!"
         msg2 = b"foofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoofoo"
-        with open("dummy_files/doi.txt", 'rb') as file:
+        with open("tests/dummy_files/doi.txt", 'rb') as file:
             text = file.read()
 
         dummy_server.start()
@@ -361,7 +361,7 @@ class TestTCPClient:
 
         msg1 = b"Hello World!"
         msg2 = b"H"
-        with open("dummy_files/doi.txt", 'rb') as file:
+        with open("tests/dummy_files/doi.txt", 'rb') as file:
             text = file.read()
 
         dummy_server.start()
@@ -386,10 +386,10 @@ class TestTCPClient:
                          logging.DEBUG,
                          "test_receive_multimedia-filehandler")
 
-        with open("dummy_files/video1.mkv", 'rb') as file:
+        with open("tests/dummy_files/video1.mkv", 'rb') as file:
             video = file.read()
 
-        with open("dummy_files/photo.jpg", 'rb') as file:
+        with open("tests/dummy_files/photo.jpg", 'rb') as file:
             photo = file.read()
 
         dummy_server.start()

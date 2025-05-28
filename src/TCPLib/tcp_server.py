@@ -10,7 +10,7 @@ import random
 from typing import Generator
 
 from .client_processor import ClientProcessor
-from .utils import encode_msg
+from .tcp_client import TCPClient
 from .message import Message
 
 logger = logging.getLogger(__name__)
@@ -97,6 +97,10 @@ class TCPServer:
         logger.debug("Server is no longer listening for messages")
 
     def _start_client_proc(self, client_id: str, client_soc: socket.socket):
+        client = TCPClient.from_socket(client_soc)
+        if not self.on_connect(client, client_id):
+            client.disconnect()
+            return
         client_proc = ClientProcessor(client_id=client_id,
                                       client_soc=client_soc,
                                       msg_q=self._messages,
@@ -110,11 +114,17 @@ class TCPServer:
         self._is_running_lock.release()
         return running
 
-    def _set_is_running(self, value):
+    def _set_is_running(self, value: bool):
         self._is_running_lock.acquire()
         self._is_running = value
         self._is_running_lock.release()
 
+    def on_connect(self, client: TCPClient, client_id: str):
+        """
+        Override to control what actions the server will take when a new client connects.
+        Returning False will disconnect the client.
+        """
+        return True
 
     @property
     def addr(self) -> tuple[str, int]:
@@ -283,7 +293,7 @@ class TCPServer:
 
     def has_messages(self) -> bool:
         """
-        Returns a boolean flag indicating if the message queue has any messages
+        Returns a boolean indicating if the message queue has any messages
         """
         return not self._messages.empty()
 
@@ -303,7 +313,7 @@ class TCPServer:
 
     def start(self, addr: tuple[str, int]):
         """
-        Starts the server and connects to the address provided.
+        Starts the server and listens to the address provided.
         """
 
         if self._get_is_running():

@@ -123,3 +123,8 @@ def error_server(request):
     yield s
     s.stop()
 
+@pytest.fixture
+def on_connect_server():
+    s = dummy_soc.OnConnectServer()
+    yield s
+    s.stop()
