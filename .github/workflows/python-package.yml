@@ -33,7 +33,7 @@ jobs:
     - name: Build and Install Wheel
       run: |
         python -m build
-        python -m pip install dist/tcplib-4.0.0-py3-none-any.whl
+        python -m pip install dist/tcplib-0.0.0-py3-none-any.whl
     - name: Lint with flake8
       run: |
         # stop the build if there are Python syntax errors or undefined names
