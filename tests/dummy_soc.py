@@ -7,6 +7,7 @@ from TCPLib.tcp_server import TCPServer
 class OnConnectServer(TCPServer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self._soc.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
     def on_connect(self, client, client_id):
         return False
@@ -73,6 +74,7 @@ class SocRaiseErr(socket.socket):
     """
 
     def __init__(self, *args, **kwargs):
+        self.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
             self.excep = kwargs['excep']
             del kwargs['excep']

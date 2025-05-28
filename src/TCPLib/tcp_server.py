@@ -108,7 +108,7 @@ class TCPServer:
         client_proc.start()
         self._update_connected_clients(client_proc.id, client_proc)
 
-    def _get_is_running(self):
+    def _get_is_running(self) -> bool:
         self._is_running_lock.acquire()
         running = self._is_running
         self._is_running_lock.release()
@@ -157,7 +157,7 @@ class TCPServer:
         return self._max_clients
 
     @max_clients.setter
-    def max_clients(self, new_max: int):
+    def max_clients(self, new_max: int) -> int:
         """
         Sets the maximum number of allowed connections. The new_max argument should be a positive integer. Setting to
         zero will allow infinite connections.
@@ -237,7 +237,7 @@ class TCPServer:
         self._connected_clients_lock.release()
         return list(client_list)
 
-    def get_client_info(self, client_id: str) -> dict | None:
+    def get_client_info(self, client_id: str) -> dict:
         """
         Gives basic info about a client given a client_id.
         Returns a dictionary with keys 'is_running', 'timeout', 'addr'.
@@ -269,7 +269,7 @@ class TCPServer:
             client.stop()
         return True
 
-    def pop_msg(self, block: bool = False, timeout: int = None) -> Message | None:
+    def pop_msg(self, block: bool = False, timeout: int = None) -> Message:
         """
         Get the next message in the queue. If block is True, this method will block until it can pop something from
         the queue, else it will try to get a value and return None if queue is empty. If block is True and a timeout

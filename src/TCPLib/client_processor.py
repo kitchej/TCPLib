@@ -74,7 +74,7 @@ class ClientProcessor:
         return self._tcp_client.timeout
 
     @timeout.setter
-    def timeout(self, timeout: int):
+    def timeout(self, timeout: int) -> int:
         """
         Sets how long the client will wait for messages from the server (in seconds). The Timeout argument should be
         a positive integer. Setting to zero will cause network operations to fail if no data is received immediately.
@@ -98,7 +98,7 @@ class ClientProcessor:
         return
 
     @property
-    def is_running(self):
+    def is_running(self) -> bool:
         """
         Returns a boolean indicating whether the client processor is set up and running
         """

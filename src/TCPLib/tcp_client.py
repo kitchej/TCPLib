@@ -64,7 +64,7 @@ class TCPClient:
         return
 
     @property
-    def timeout(self) -> int | None:
+    def timeout(self) -> int:
         return self._timeout
 
     @timeout.setter
@@ -77,7 +77,7 @@ class TCPClient:
             self._soc.settimeout(self._timeout)
 
     @property
-    def host_addr(self) -> tuple[str | None, int | None]:
+    def host_addr(self) -> tuple[str, int]:
         return self._host_addr
 
     @host_addr.setter
@@ -85,7 +85,7 @@ class TCPClient:
         return
 
     @property
-    def remote_addr(self) -> tuple[str | None, int | None]:
+    def remote_addr(self) -> tuple[str, int]:
         return self._remote_addr
 
     @remote_addr.setter
@@ -93,7 +93,7 @@ class TCPClient:
         return
 
     @property
-    def is_host(self):
+    def is_host(self) -> bool:
         return self._is_host
 
     @is_host.setter
@@ -195,7 +195,7 @@ class TCPClient:
     def send(self, data: bytes):
         return self.send_bytes(encode_msg(data))
 
-    def receive_bytes(self, size: int) -> bytes | None:
+    def receive_bytes(self, size: int) -> bytes:
         """
         Receive only the number of bytes specified, returns None if connection was closed prematurely. Raises TimeoutError,
         ConnectionError, and OSError.
