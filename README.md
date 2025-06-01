@@ -80,8 +80,6 @@ output:
 
 ### Installation
 
-This package is not available on pypi at the moment, but can still be installed with pip:
+Install with pip:
 
-1.) Download the wheel file ```TCP_Lib-4.0.0-py3-none-any.whl``` from the releases page
-
-2.) In the terminal execute: ```pip install [path to wheel file]```
+```pip install TCPLib```
