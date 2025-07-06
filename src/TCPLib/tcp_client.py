@@ -101,7 +101,7 @@ class TCPClient:
     def is_host(self, value):
         return
 
-    def host_single_client(self, addr: tuple[int, str], timeout: int = None):
+    def host_single_client(self, addr: tuple[str, int], timeout: int = None):
         """
         Hosts a single connection from a remote TCP/IP connection. The timeout argument sets how long this
         method will listen for a connection. Raises TimeoutError, ConnectionError, and socket.gaierror.
