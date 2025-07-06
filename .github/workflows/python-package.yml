@@ -33,7 +33,7 @@ jobs:
     - name: Build and Install Wheel
       run: |
         python -m build
-        python -m pip install dist/tcplib-0.0.0-py3-none-any.whl
+        python -m pip install dist/tcplib-1.1.0-py3-none-any.whl
     - name: Test with pytest
       run: |
         pytest
