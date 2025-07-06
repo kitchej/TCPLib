@@ -11,7 +11,7 @@ All data received is returned as a ```bytearray```.
 
 server.py
 
-    from TCPLib.tcp_server import TCPServer
+    from TCPLib import TCPServer
     
     server = TCPServer()
     server.start(("127.0.0.1", 5000))
@@ -26,7 +26,7 @@ server.py
 
 client.py
 
-    from TCPLib.tcp_client import TCPClient
+    from TCPLib import TCPClient
     
     client = TCPClient()
     client.connect(("127.0.0.1", 5000))
@@ -59,7 +59,7 @@ connects to a host client instead of a server:
 
 host_client.py 
 
-    from TCPLib.tcp_client import TCPClient
+    from TCPLib import TCPClient
     
     client = TCPClient()
     print(f"Listening for a connection...")
@@ -79,6 +79,7 @@ output:
 
 
 ### Installation
+
 
 **Requires Python 3.10 or higher**
 
