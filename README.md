@@ -80,7 +80,8 @@ output:
 
 ### Installation
 
-Requires Python 3.10 or higher
+
+**Requires Python 3.10 or higher**
 
 Install with pip:
 
