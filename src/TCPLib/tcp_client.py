@@ -6,13 +6,9 @@ import logging
 import socket
 from typing import Generator
 
-from .utils import encode_msg, decode_header
+from .utils import encode_msg, decode_header, vet_address
 
 logger = logging.getLogger(__name__)
-
-
-class NegativeBufferValue(Exception):
-    pass
 
 
 class TCPClient:
@@ -23,22 +19,30 @@ class TCPClient:
     def __init__(self, timeout: int = None):
         self._soc = None
         self._listen_soc = None
-        self._remote_addr = (None, None)
-        self._host_addr = (None, None)
+        self._peer_addr = None
+        self._local_addr = None
         self._timeout = timeout
         self._is_connected = False
         self._is_host = False
+        self._last_connected_peer = None # Be aware, this is not necessarily the currently connected peer!
+
+    '''TODO: Write some tests to make sure these are working properly'''
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.disconnect()
 
     @classmethod
     def from_socket(cls, soc: socket.socket) -> "TCPClient":
         """
-        Allows for a client to be created from a socket object. The socket must be initialized and connected. Returns
-        a new TCPClient object.
+        Allows for a client to be created from a socket object. Returns new TCPClient object.
         """
         out = cls(soc.gettimeout())
         out._soc = soc
         try:
-            out._host_addr = soc.getpeername()
+            out._peer_addr = soc.getpeername()
+            out._local_addr = out._soc.getsockname()
         except OSError:  # Not connected
             return out
         out._is_connected = True
@@ -46,30 +50,51 @@ class TCPClient:
 
     def _clean_up(self):
         if self._soc is not None:
-            self._soc.close()
-            self._soc = None
+            try:
+                self._soc.close()
+            except OSError:
+                logger.exception("Error when trying to close socket")
+            finally:
+                self._soc = None
+
         if self._listen_soc is not None:
-            self._listen_soc.close()
-            self._listen_soc = None
-        self._remote_addr = (None, None)
-        self._host_addr = (None, None)
+            try:
+                self._listen_soc.close()
+            except OSError:
+                logger.exception("Error when trying to close listening socket")
+            finally:
+                self._listen_soc = None
+
+        self._peer_addr = None
+        self._local_addr = None
         self._is_connected = False
         self._is_host = False
 
+    def _handle_error(self, exception, log_msg, *log_args):
+        logger.exception(log_msg, *log_args)
+        self._clean_up()
+        raise exception
+
     @property
     def is_connected(self) -> bool:
+        """Returns a boolean indicating if a connection is open"""
         return self._is_connected
 
-    @is_connected.setter
-    def is_connected(self, value):
-        return
-
     @property
-    def timeout(self) -> int:
+    def timeout(self) -> int | None:
+        """
+        Returns the current timeout value of the client. 'None' indicates an infinite timeout.
+        See https://docs.python.org/3/library/socket.html#socket-timeouts for more information about timeouts.
+        """
         return self._timeout
 
     @timeout.setter
-    def timeout(self, timeout: int):
+    def timeout(self, timeout: int | None):
+        """
+        Sets the timeout (in seconds) of the client. The Timeout argument should be a positive integer.
+        Passing 'None' will set the timeout to infinity.
+        See https://docs.python.org/3/library/socket.html#socket-timeouts for more information about timeouts.
+        """
         if timeout is not None:
             if timeout < 0:
                 raise ValueError("Value for timeout should be a positive integer")
@@ -78,59 +103,61 @@ class TCPClient:
             self._soc.settimeout(self._timeout)
 
     @property
-    def host_addr(self) -> tuple[str, int]:
-        return self._host_addr
-
-    @host_addr.setter
-    def host_addr(self, value):
-        return
+    def local_addr(self) -> tuple[str, int] | None:
+        """
+        Returns the address of this client object. If the client is hosting, this is the address
+        that was bound to. Returns 'None' if not connected.
+        """
+        return self._local_addr
 
     @property
-    def remote_addr(self) -> tuple[str, int]:
-        return self._remote_addr
-
-    @remote_addr.setter
-    def remote_addr(self, value):
-        return
+    def peer_addr(self) -> tuple[str, int] | None:
+        """Returns the address of this client object's remote peer. Returns 'None' if not connected."""
+        return self._peer_addr
 
     @property
     def is_host(self) -> bool:
+        """Returns a boolean indicating if this client is hosting another client"""
         return self._is_host
 
-    @is_host.setter
-    def is_host(self, value):
-        return
-
-    def host_single_client(self, addr: tuple[str, int], timeout: int = None):
+    def host_single_client(self, addr: tuple[str, int], timeout: int | None = None):
         """
         Hosts a single connection from a remote TCP/IP connection. The timeout argument sets how long this
-        method will listen for a connection. Raises TimeoutError, ConnectionError, and socket.gaierror.
+        method will listen for a connection; 'None' indicates an infinite timeout (default).
+        Raises TimeoutError, ConnectionError, OSError, and socket.gaierror.
         """
         if self._is_connected:
             return
+
+        if not vet_address(addr):
+            raise ValueError(f"{addr} is an invalid ipv4 address")
+        if addr[0] == "255.255.255.255":
+            raise ValueError("Cannot connect to '255.255.255.255' (broadcast address)")
+
+        self._local_addr = addr
         self._listen_soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._listen_soc.settimeout(timeout)
-        self._listen_soc.bind(addr)
+        try:
+            self._listen_soc.bind(self._local_addr)
+        except socket.gaierror as e:
+            self._handle_error(e,"Could not resolve address %s @ %d", self._local_addr[0], self._local_addr[1])
+        except OSError as e:
+            self._handle_error(e,"Exception while binding to %s @ %d", self._local_addr[0], self._local_addr[1])
+
+        logger.info("Listening for connections on %s @ %d", self._local_addr[0], self._local_addr[1])
         try:
             self._listen_soc.listen()
             client_soc, client_addr = self._listen_soc.accept()
             self._soc = client_soc
-            self._remote_addr = client_addr
+            self._peer_addr = client_addr
+            self._last_connected_peer = self._peer_addr
             self._is_connected = True
             self._is_host = True
-            logger.info("Accepted Connection from %s @ %d", client_addr[0], client_addr[1])
+            logger.info("Accepted connection from %s @ %d", client_addr[0], client_addr[1])
         except TimeoutError as e:
-            self._clean_up()
-            raise e
+            self._handle_error(e,"Timed out while attempting to connect to remote client")
         except ConnectionError as e:
-            self._clean_up()
-            raise e
-        except socket.gaierror as e:
-            self._clean_up()
-            raise e
-        except OSError as e:
-            self._clean_up()
-            raise e
+            self._handle_error(e,"Failed to establish connection to remote client")
         self._listen_soc.close()
         self._listen_soc = None
         return
@@ -141,84 +168,87 @@ class TCPClient:
         """
         if self._is_connected:
             return
+
+        if not vet_address(addr):
+            raise ValueError(f"{addr} is an invalid ipv4 address")
+        if addr[0] == "0.0.0.0":
+            raise ValueError("Cannot connect to '0.0.0.0' (unspecified address)")
+        if addr[0] == "255.255.255.255":
+            raise ValueError("Cannot connect to '255.255.255.255' (broadcast address)")
+
         if not self._soc:
             self._soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._soc.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self._soc.settimeout(self._timeout)
-        self._host_addr = addr
-        logger.info("Attempting to connect to %s @ %d", self._host_addr[0], self._host_addr[1])
+        self._peer_addr = addr
+        self._last_connected_peer = addr
+        logger.info("Attempting to connect to %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
         try:
-            self._soc.connect(self._host_addr)
+            self._soc.connect(self._peer_addr)
             self._is_connected = True
             self._is_host = False
+            self._local_addr = self._soc.getsockname()
+            logger.info("Successfully connected to %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
         except TimeoutError as e:
-            self._clean_up()
-            raise e
+            self._handle_error(e,"Timed out while attempting to connect to %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
         except ConnectionError as e:
-            self._clean_up()
-            raise e
+            self._handle_error(e,"Could not connect to %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
         except socket.gaierror as e:
-            self._clean_up()
-            raise e
+            self._handle_error(e,"Could not resolve address %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
         except OSError as e:
-            self._clean_up()
-            raise e
+            self._handle_error(e,"OSError while connecting to %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
 
     def disconnect(self):
-        """
-        Disconnect from the currently connected host. If no connection is opened, this method does nothing.
-        """
+        """Disconnect from the currently connected host. If no connection is opened, this method does nothing."""
         if self._is_connected:
             self._clean_up()
-            logger.info("Disconnected from host")
+            logger.info("Disconnected from %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
 
-    def send_bytes(self, data: bytes):
-        """
-        Send raw bytes with no size header. Raises TimeoutError, ConnectionError, and OSError.
-        """
+    def send_bytes(self, data: bytes) -> bool:
+        """Send raw bytes with no size header. Raises TimeoutError, ConnectionError, and OSError."""
         if not self._is_connected:
-            return False
+            raise ConnectionError("Client is not connected to a host")
         try:
             self._soc.sendall(data)
             return True
-        except AttributeError:  # Socket was closed from another thread
+        except AttributeError: # Socket was closed from another thread
             self._clean_up()
             return False
         except TimeoutError as e:
-            self._clean_up()
-            raise e
+            self._handle_error(e,"Timed out while sending to %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
         except ConnectionError as e:
-            self._clean_up()
-            raise e
+            self._handle_error(e, "Connection error while sending to %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
         except OSError as e:
-            self._clean_up()
-            raise e
+            self._handle_error(e,"OSError while sending to %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
 
-    def send(self, data: bytes):
-        """
-        Send raw bytes with a 4 byte size header attached. Raises TimeoutError, ConnectionError, and OSError.
-        """
+    def send(self, data: bytes) -> bool:
+        """Send raw bytes with a 4 byte size header attached. Raises TimeoutError, ConnectionError, and OSError."""
+        if not self._is_connected:
+            raise ConnectionError("Client is not connected to a host")
         return self.send_bytes(encode_msg(data))
 
     def receive_bytes(self, size: int) -> bytes:
         """
-        Receive only the number of bytes specified. Returns None if connection was closed prematurely. Raises TimeoutError,
-        ConnectionError, and OSError.
+        Receive only the number of bytes specified. Returns an empty bytes-like object on failure or closed connection.
+        Raises TimeoutError, ConnectionError, and OSError.
         """
+        if not self.is_connected:
+            raise ConnectionError("Client is not connected to a host")
+        if size <= 0:
+            raise ValueError("'size' argument must be a non-zero, positive integer")
         try:
             data = self._soc.recv(size)
             return data
-        except AttributeError:  # Socket was closed from another thread
+        except AttributeError: # Socket was closed from another thread
             self._clean_up()
+            return bytes(0)
         except TimeoutError as e:
-            self._clean_up()
-            raise e
+            self._handle_error(e,"Timed out while receiving to %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
         except ConnectionError as e:
-            self._clean_up()
-            raise e
+            self._handle_error(e,"Connection error while receiving from %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
         except OSError as e:
-            self._clean_up()
-            raise e
+            self._handle_error(e,"OSError while receiving from %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
+
 
     def iter_receive(self, buff_size: int = 4096) -> Generator:
         """
@@ -227,23 +257,28 @@ class TCPClient:
         TimeoutError, ConnectionError, and OSError.
         """
         if not self._is_connected:
-            return
+            raise ConnectionError("Client is not connected to a host")
         if buff_size <= 0:
-            raise NegativeBufferValue("Argument buff_size must be a non-zero, positive integer")
+            raise ValueError("'buff_size' argument must be a non-zero, positive integer")
         bytes_recv = 0
         header = self.receive_bytes(4)
-        if not header:  # Socket was closed from another thread
+        if not header:
+            return
+        if len(header) < 4:
+            logger.warning("Incomplete header from %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
             return
         size = decode_header(header)
         logger.debug("Incoming message from %s @ %d, SIZE=%d",
-                     self._host_addr[0], self._host_addr[1], size)
+                     self._last_connected_peer[0], self._last_connected_peer[1], size)
         yield size
         if size < buff_size:
             buff_size = size
         while bytes_recv < size:
             data = self.receive_bytes(buff_size)
-            if not data:  # Socket was closed from another thread
-                return
+            if not data:
+                logger.debug("Failed to complete reception of message from %s @ %d. %d/%d bytes received",
+                             self._last_connected_peer[0], self._last_connected_peer[1], bytes_recv, size)
+                raise StopIteration
             bytes_recv += len(data)
             remaining = size - bytes_recv
             if remaining < buff_size:
@@ -252,24 +287,24 @@ class TCPClient:
 
     def receive(self, buff_size: int = 4096) -> bytearray:
         """
-        Receive raw bytes. Expects a 4 bytes size header to be attached. Returns a bytearray. Raises TimeoutError, ConnectionError, and OSError.
+        Receive raw bytes. Expects a 4 bytes size header to be attached. Returns a bytearray. Returns an empty bytearray
+        on failure or closed connection. Raises TimeoutError, ConnectionError, and OSError.
         """
-        data = bytearray()
         if not self._is_connected:
-            return data
+            raise ConnectionError("Client is not connected to a host")
+        if buff_size <= 0:
+            raise ValueError("'buff_size' argument must be a non-zero, positive integer")
         gen = self.iter_receive(buff_size)
         if not gen:
-            return data
+            return bytearray()
         try:
-            next(gen)
+            next(gen) # Size is always yielded first, but we won't need it in this method
         except StopIteration:
-            return data
+            return bytearray()
+        data = bytearray()
         for chunk in gen:
             if not chunk:
                 return data
             data.extend(chunk)
-        if self._host_addr == (None, None):
-            logger.debug("Received a total of %d bytes", len(data))
-        else:
-            logger.debug("Received a total of %d bytes from %s @ %d", len(data), self._host_addr[0], self._host_addr[1])
+        logger.debug("Received a total of %d bytes from %s @ %d", len(data), self._last_connected_peer[0], self._last_connected_peer[1])
         return data

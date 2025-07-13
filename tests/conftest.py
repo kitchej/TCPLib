@@ -24,6 +24,10 @@ def pytest_collection_modifyitems(items):
     https://stackoverflow.com/questions/70738211/run-pytest-classes-in-custom-order/70758938#70758938
 
     Modifies test items in place to ensure test classes run in a given order.
+
+    This is necessary since the library's classes are dependent on each other. A TCPServer object has many
+    ClientProcessor objects, and every ClientProcessor object has a TCPClient object. In other words, if a composed class
+    fails its testing, the container class will most likely fail its tests too.
     """
     CLASS_ORDER = ["TestClientProcessor", "TestTCPClient", "TestUtils"]
     class_mapping = {item: item.cls.__name__ for item in items}

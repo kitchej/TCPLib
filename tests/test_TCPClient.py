@@ -21,8 +21,8 @@ class TestTCPClient:
     def assert_default_state(c):
         assert c._soc is None
         assert c._listen_soc is None
-        assert c._remote_addr == (None, None)
-        assert c._host_addr == (None, None)
+        assert c._peer_addr is None
+        assert c._local_addr is None
         assert c._timeout is None
         assert c._is_connected is False
         assert c._is_host is False
@@ -63,14 +63,17 @@ class TestTCPClient:
 
         assert isinstance(client._soc, socket.socket)
         assert client._listen_soc is None
-        assert client._remote_addr == (None, None)
-        assert client._host_addr == (HOST, PORT)
+        assert client._local_addr is not None
+        assert client._peer_addr == (HOST, PORT)
         assert client._timeout is None
         assert client._is_connected is True
         assert client._is_host is False
 
         assert client.is_connected
-        client.is_connected = False
+        try:
+            client.is_connected = False
+        except Exception as e:
+            assert isinstance(e, AttributeError)
         assert client.is_connected
 
         assert client.timeout is None
@@ -79,12 +82,18 @@ class TestTCPClient:
         assert client._soc.timeout == 10
         client.timeout = None
 
-        assert client.host_addr == (HOST, PORT)
-        client.host_addr = ("192.168.010", 6000)
-        assert client.host_addr == (HOST, PORT)
+        assert client.peer_addr == (HOST, PORT)
+        try:
+            client.peer_addr = ("192.168.010", 6000)
+        except Exception as e:
+            assert isinstance(e, AttributeError)
+        assert client.peer_addr == (HOST, PORT)
 
         assert client.is_host is False
-        client.is_host = True
+        try:
+            client.is_host = True
+        except Exception as e:
+            assert isinstance(e, AttributeError)
         assert client.is_host is False
 
         client.disconnect()
@@ -102,8 +111,8 @@ class TestTCPClient:
 
         assert isinstance(c._soc, socket.socket)
         assert c._listen_soc is None
-        assert c._remote_addr == (None, None)
-        assert c._host_addr == (HOST, PORT)
+        assert c._local_addr is not None
+        assert c._peer_addr == (HOST, PORT)
         assert c._timeout is None
         assert c._is_connected is True
         assert c._is_host is False
@@ -129,8 +138,8 @@ class TestTCPClient:
 
         assert isinstance(client._soc, socket.socket)
         assert client._listen_soc is None
-        assert client._remote_addr == dummy_client.getsockname()
-        assert client._host_addr == (None, None)
+        assert client._peer_addr == dummy_client.getsockname()
+        assert client._local_addr == (HOST, PORT)
         assert client._timeout is None
         assert client._is_connected is True
         assert client._is_host is True
@@ -403,3 +412,20 @@ class TestTCPClient:
         dummy_server.send(encode_msg(video))
         time.sleep(0.1)
         assert client.receive() == video
+
+    def test_context_manager(self, dummy_server):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_context_manager.log"),
+                         logging.DEBUG,
+                         "test_context_manager-filehandler")
+
+        dummy_server.start()
+        threading.Thread(target=lambda: dummy_server.soc.recv(1024)).start()
+        with TCPClient() as client:
+            client.connect((HOST, PORT))
+            time.sleep(0.1)
+            assert client.is_connected
+            client.send(b"Hello World!")
+            time.sleep(0.1)
+
+        assert client.is_connected is False

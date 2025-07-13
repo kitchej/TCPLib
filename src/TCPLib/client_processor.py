@@ -59,19 +59,16 @@ class ClientProcessor:
         """
         return self._client_id
 
-    @id.setter
-    def id(self, value):
-        return
 
     @property
-    def timeout(self) -> int:
+    def timeout(self) -> int | None:
         """
         Returns an int representing the current timeout value.
         """
         return self._tcp_client.timeout
 
     @timeout.setter
-    def timeout(self, timeout: int) -> int:
+    def timeout(self, timeout: int):
         """
         Sets how long the client will wait for messages from the server (in seconds). The Timeout argument should be
         a positive integer. Setting to zero will cause network operations to fail if no data is received immediately.
@@ -87,23 +84,12 @@ class ClientProcessor:
         """
         return self._remote_addr
 
-    @remote_addr.setter
-    def remote_addr(self, value):
-        """
-        This should never be changed. Ever.
-        """
-        return
-
     @property
     def is_running(self) -> bool:
         """
         Returns a boolean indicating whether the client processor is set up and running
         """
         return self._is_running
-
-    @is_running.setter
-    def is_running(self, value):
-        return
 
     def send(self, data: bytes) -> bool:
         """

@@ -92,19 +92,19 @@ class SocRaiseErr(socket.socket):
                 raise self.excep
         if backlog is ...:
             backlog = 0
-        super().listen(backlog)
+        return super().listen(backlog)
 
     def accept(self):
         if self.func_to_fail == 'accept':
             if self.excep:
                 raise self.excep
-        super().accept()
+        return super().accept()
 
     def connect(self, address, /):
         if self.func_to_fail == 'connect':
             if self.excep:
                 raise self.excep
-        super().connect(address)
+        return super().connect(address)
 
     def sendall(self, data, flags=..., /):
         if self.func_to_fail == 'sendall':
@@ -112,7 +112,7 @@ class SocRaiseErr(socket.socket):
                 raise self.excep
         if flags is ...:
             flags = 0
-        super().sendall(data, flags)
+        return super().sendall(data, flags)
 
     def recv(self, bufsize, flags=..., /):
         if self.func_to_fail == 'recv':
@@ -120,4 +120,4 @@ class SocRaiseErr(socket.socket):
                 raise self.excep
         if flags is ...:
             flags = 0
-        super().recv(bufsize, flags)
+        return super().recv(bufsize, flags)

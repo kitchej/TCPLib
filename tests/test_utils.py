@@ -27,3 +27,17 @@ class TestUtils:
         assert utils.decode_header(b'\x00\x00\x00\x04') == 4
         assert utils.decode_header(b'\x00\x00\x87\x76') == 34678
         assert utils.decode_header(b'\x02\xB3\xEB\x83') == 45345667
+
+    def test_vet_address(self):
+        assert utils.vet_address(("127.0.0.1", 5000)) is True
+        assert utils.vet_address(("255.255.255.255", 65535)) is True
+        assert utils.vet_address(("0.0.0.0", 0)) is True
+
+        assert utils.vet_address(("127.0..0.1", 5000)) is False
+        assert utils.vet_address(("127.00.0.1", 5000)) is False
+        assert utils.vet_address(("127.0.0.1.1", 5000)) is False
+        assert utils.vet_address(("127.0.0", 5000)) is False
+
+        assert utils.vet_address(("127.0.0.1", -1)) is False
+        assert utils.vet_address(("127.0.0.1", 70000)) is False
+        assert utils.vet_address(("127.0.0.1", 65536)) is False
