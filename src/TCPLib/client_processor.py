@@ -19,7 +19,7 @@ class ClientProcessor:
     Maintains a single TCP/IP client connection.
     """
 
-    def __init__(self, client_id, client_soc: socket.socket, msg_q: queue.Queue, buff_size=4096, timeout: int = None):
+    def __init__(self, client_id, client_soc: socket.socket, msg_q: queue.Queue, buff_size=4096, timeout: int | None = None):
         self._client_id = client_id
         self._tcp_client = TCPClient.from_socket(client_soc)
         self._tcp_client.timeout = timeout
@@ -27,30 +27,45 @@ class ClientProcessor:
         self._msg_q = msg_q
         self._buff_size = buff_size
         self._is_running = False
+        self._thread = None
+        self._is_running_lock = threading.Lock()
 
     def _receive_loop(self):
         logger.debug("Client %s is listening for new messages from %s @ %d",
                      self._client_id, self.remote_addr[0], self.remote_addr[1])
-        self._is_running = True
-        while self._is_running:
+        self._set_is_running(True)
+        while self.is_running:
             try:
                 data = self._tcp_client.receive(self._buff_size)
-            except AttributeError:  # Socket was closed from another thread
+            except AttributeError: # Socket was closed from another thread
+                logger.debug("Socket was closed during receive loop")
                 self.stop()
                 return
             except TimeoutError:
+                logger.exception("Timed out while receiving from %s @ %d", self.remote_addr[0], self.remote_addr[1])
                 self.stop()
                 return
             except ConnectionError:
+                logger.exception("Connection error while receiving from %s @ %d", self.remote_addr[0], self.remote_addr[1])
                 self.stop()
                 return
             except OSError:
+                logger.exception("OS error while receiving from %s @ %d", self.remote_addr[0],
+                                 self.remote_addr[1])
                 self.stop()
                 return
 
             if len(data) == 0:
-                continue
+                logger.info("Received empty data from client %s, stopping", self._client_id)
+                self.stop()
+                return
+
             self._msg_q.put(Message(len(data), data, self._client_id))
+
+    def _set_is_running(self, new_value):
+        with self._is_running_lock:
+            self._is_running = new_value
+
 
     @property
     def id(self) -> str:
@@ -89,7 +104,8 @@ class ClientProcessor:
         """
         Returns a boolean indicating whether the client processor is set up and running
         """
-        return self._is_running
+        with self._is_running_lock:
+            return self._is_running
 
     def send(self, data: bytes) -> bool:
         """
@@ -99,19 +115,25 @@ class ClientProcessor:
         return self._tcp_client.send(data)
 
     def start(self):
-        if self._is_running:
+        """
+        Starts the client processor. If the processor is already running, this method does nothing.
+        """
+        if self.is_running:
             return
 
-        th = threading.Thread(target=self._receive_loop)
-        th.start()
-        logger.info(f"Processing connection to %s @ %d as client #%s", self.remote_addr[0],
+        if self._thread is None:
+            self._thread = threading.Thread(target=self._receive_loop, daemon=True)
+            self._thread.start()
+            logger.info("Processing connection to %s @ %d as client #%s", self.remote_addr[0],
                     self.remote_addr[1], self._client_id)
 
     def stop(self):
         """
-        Stops the client processor. If the client is not running, this method does nothing.
+        Stops the client processor. If the processor is not running, this method does nothing.
         """
-        if self._is_running:
-            self._is_running = False
+        if self.is_running:
+            self._set_is_running(False)
+            if self._thread:
+                self._thread.join(timeout=1) # Wait for _receive_loop to quit on its own
             self._tcp_client.disconnect()
-            logger.info(f"Client %s has been stopped.", self._client_id)
+            logger.info("Client %s has been stopped.", self._client_id)

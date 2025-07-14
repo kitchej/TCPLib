@@ -34,15 +34,24 @@ class TCPClient:
         self.disconnect()
 
     @classmethod
-    def from_socket(cls, soc: socket.socket) -> "TCPClient":
+    def from_socket(cls, soc: socket.socket, is_listen_soc=False) -> "TCPClient":
         """
-        Allows for a client to be created from a socket object. Returns new TCPClient object.
+        Allows for a client to be created from a socket object. Socket must be initialized and connected. Timeout value
+        for the socket is overridden when connect() or host_single_client() is called to ensure class consistency.
+        Returns new TCPClient object. NOTE: if socket.bind() is called before passing to this method, host_single_client
+        will raise OSError.
         """
         out = cls(soc.gettimeout())
-        out._soc = soc
+        if is_listen_soc:
+            out._listen_soc = soc
+            out._is_host = True
+            return out
+        else:
+            out._soc = soc
         try:
             out._peer_addr = soc.getpeername()
-            out._local_addr = out._soc.getsockname()
+            out._local_addr = soc.getsockname()
+            out._last_connected_peer = out._peer_addr
         except OSError:  # Not connected
             return out
         out._is_connected = True
@@ -134,9 +143,11 @@ class TCPClient:
         if addr[0] == "255.255.255.255":
             raise ValueError("Cannot connect to '255.255.255.255' (broadcast address)")
 
-        self._local_addr = addr
-        self._listen_soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        if not self._listen_soc:
+            self._listen_soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
         self._listen_soc.settimeout(timeout)
+        self._local_addr = addr
         try:
             self._listen_soc.bind(self._local_addr)
         except socket.gaierror as e:
@@ -169,19 +180,20 @@ class TCPClient:
         if self._is_connected:
             return
 
-        if not vet_address(addr):
-            raise ValueError(f"{addr} is an invalid ipv4 address")
-        if addr[0] == "0.0.0.0":
-            raise ValueError("Cannot connect to '0.0.0.0' (unspecified address)")
-        if addr[0] == "255.255.255.255":
-            raise ValueError("Cannot connect to '255.255.255.255' (broadcast address)")
-
         if not self._soc:
+            if not vet_address(addr):
+                raise ValueError(f"{addr} is an invalid ipv4 address")
+            if addr[0] == "0.0.0.0":
+                raise ValueError("Cannot connect to '0.0.0.0' (unspecified address)")
+            if addr[0] == "255.255.255.255":
+                raise ValueError("Cannot connect to '255.255.255.255' (broadcast address)")
             self._soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._soc.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self._soc.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
         self._soc.settimeout(self._timeout)
         self._peer_addr = addr
         self._last_connected_peer = addr
+
         logger.info("Attempting to connect to %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
         try:
             self._soc.connect(self._peer_addr)

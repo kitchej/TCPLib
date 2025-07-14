@@ -9,9 +9,12 @@ import queue
 import random
 from typing import Generator
 
+
+
 from .client_processor import ClientProcessor
 from .tcp_client import TCPClient
 from .message import Message
+from .utils import vet_address
 
 logger = logging.getLogger(__name__)
 
@@ -35,13 +38,10 @@ class TCPServer:
     @classmethod
     def from_socket(cls, soc: socket.socket, max_clients: int = 0) -> "TCPServer":
         """
-        Allows for a server to be created from a socket object. The socket must be initialized and bound to an address.
+        Allows for a server to be created from a socket object. Returns a TCPServer object.
         """
         out = cls(max_clients, soc.gettimeout())
         out._soc = soc
-        out._addr = soc.getsockname()
-        threading.Thread(target=out._mainloop).start()
-        logger.info("Server has been started")
         return out
 
     @staticmethod
@@ -64,11 +64,6 @@ class TCPServer:
         self._connected_clients_lock.acquire()
         self._connected_clients.update({client_id: client})
         self._connected_clients_lock.release()
-
-    def _create_soc(self):
-        self._soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._soc.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self._soc.bind(self._addr)
 
     def _mainloop(self):
         logger.debug("Server is listening for connections")
@@ -300,8 +295,19 @@ class TCPServer:
 
         if self._get_is_running():
             return
+
+        if not vet_address(addr):
+            raise ValueError(f"{addr} is an invalid ipv4 address")
+        if addr[0] == "255.255.255.255":
+            raise ValueError("Cannot connect to '255.255.255.255' (broadcast address)")
+
         self._addr = addr
-        self._create_soc()
+
+        if not self._soc:
+            self._soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self._soc.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+        self._soc.bind(self._addr)
         threading.Thread(target=self._mainloop).start()
         logger.info("Server has been started")
 

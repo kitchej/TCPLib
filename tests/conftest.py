@@ -97,6 +97,13 @@ def client_processor(dummy_client, dummy_server):
     dummy_server.stop()
 
 @pytest.fixture
+def error_host_client(request):
+    soc = dummy_soc.SocRaiseErr(excep=request.param[0], func_to_fail=request.param[1])
+    c = TCPClient.from_socket(soc, is_listen_soc=True)
+    yield c
+    c.disconnect()
+
+@pytest.fixture
 def error_client(request):
     soc = dummy_soc.SocRaiseErr(excep=request.param[0], func_to_fail=request.param[1])
     c = TCPClient.from_socket(soc)

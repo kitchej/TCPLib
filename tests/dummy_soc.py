@@ -37,11 +37,12 @@ class DummyServer(ConfigurableClient):
         self.listen_soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.listen_soc.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.listen_soc.bind((host, port))
+        self.server_ready = threading.Event()
 
     def listen(self, delay):
         try:
             self.listen_soc.listen()
-            time.sleep(delay)
+            self.server_ready.set()
             self.soc, _ = self.listen_soc.accept()
             self.listen_soc.close()
         except OSError:
@@ -49,7 +50,8 @@ class DummyServer(ConfigurableClient):
 
     def start(self, delay=0):
         threading.Thread(target=self.listen, args=[delay]).start()
-        time.sleep(0.1)
+        self.server_ready.wait()
+
 
     def stop(self):
         if self.listen_soc:
@@ -66,6 +68,7 @@ class SocRaiseErr(socket.socket):
         - func_to_fail = Method to raise exception in
             Valid values are:
             - accept
+            - bind
             - listen
             - connect
             - sendall
@@ -99,6 +102,12 @@ class SocRaiseErr(socket.socket):
             if self.excep:
                 raise self.excep
         return super().accept()
+
+    def bind(self, address, /):
+        if self.func_to_fail == 'bind':
+            if self.excep:
+                raise self.excep
+        return super().bind(address)
 
     def connect(self, address, /):
         if self.func_to_fail == 'connect':
