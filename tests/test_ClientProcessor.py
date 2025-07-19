@@ -190,10 +190,10 @@ class TestClientProcessor:
                          logging.DEBUG, "test_stop_called_twice-filehandler")
         processor = client_processor[0]
 
-        with caplog.at_level(logging.INFO):
+        with caplog.at_level(logging.DEBUG):
             processor.start()
             processor.stop()
-            processor.stop()  # Should do nothing
+            processor.stop()
 
         assert len([record for record in caplog.records if "has been stopped." in record.msg]) == 1
 

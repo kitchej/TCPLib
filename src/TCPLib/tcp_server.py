@@ -7,6 +7,8 @@ import socket
 import threading
 import queue
 import random
+import time
+from functools import partial
 from typing import Generator
 
 
@@ -35,10 +37,18 @@ class TCPServer:
         self._connected_clients = {}
         self._connected_clients_lock = threading.Lock()
 
+    def __repr__(self):
+        return (f"<TCPServer addr={self._addr} "
+                f"running={self.is_running} "
+                f"max_clients={self.max_clients} "
+                f"client_count={self.client_count}>")
+
     @classmethod
     def from_socket(cls, soc: socket.socket, max_clients: int = 0) -> "TCPServer":
         """
         Allows for a server to be created from a socket object. Returns a TCPServer object.
+        NOTE: socket.bind() and socket.listen() are called on the socket when start() is called. If bind() or listen()
+        are called on the socket BEFORE start(), an exception will be raised.
         """
         out = cls(max_clients, soc.gettimeout())
         out._soc = soc
@@ -46,49 +56,57 @@ class TCPServer:
 
     @staticmethod
     def _generate_client_id() -> str:
-        client_id = str(random.randint(0, 999999))
-        client_id = int(client_id, base=36)
-        return str(client_id)
+        timestamp_part = str(int(time.time() * 1000))[-9:]
+        random_part = f"{random.randint(0, 999):03d}"
+        return timestamp_part + random_part
 
     def _get_client(self, client_id: str) -> ClientProcessor | None:
-        self._connected_clients_lock.acquire()
-        try:
-            client = self._connected_clients[client_id]
-        except KeyError:
-            self._connected_clients_lock.release()
-            return
-        self._connected_clients_lock.release()
-        return client
+        with self._connected_clients_lock:
+            try:
+                client = self._connected_clients[client_id]
+            except KeyError:
+                return
+            return client
 
     def _update_connected_clients(self, client_id: str, client: ClientProcessor):
-        self._connected_clients_lock.acquire()
-        self._connected_clients.update({client_id: client})
-        self._connected_clients_lock.release()
+        with self._connected_clients_lock:
+            self._connected_clients.update({client_id: client})
 
     def _mainloop(self):
         logger.debug("Server is listening for connections")
         self._set_is_running(True)
-        while self._get_is_running():
+        while self.is_running:
             try:
-                self._soc.listen()
+                client_soc, client_addr = None, None
                 client_soc, client_addr = self._soc.accept()
-                logger.info("Accepted Connection from %s @ %d", client_addr[0], client_addr[1])
                 if self.is_full:
                     logger.warning("%s @ %d was denied connection due to server being full",
                                    client_addr[0], client_addr[1])
                     client_soc.close()
                     continue
                 self._start_client_proc(self._generate_client_id(), client_soc)
-            except ConnectionError:
-                continue
             except TimeoutError:
+                if client_addr is None:
+                    logger.warning("New connection timed out before connection could be accepted")
+                else:
+                    logger.warning("%s @ %d timed out while setting up it's client processor",
+                                 client_addr[0], client_addr[1])
+                continue
+            except ConnectionError as e:
+                if client_addr is None:
+                    logger.warning("New connection was disconnected before connection could be accepted")
+                else:
+                    logger.warning("%s @ %d was disconnected while setting up it's client processor",
+                                 client_addr[0], client_addr[1])
                 continue
             except AttributeError:  # Socket was closed from another thread
                 self.stop()
                 break
             except OSError:
+                logger.exception("OSError raised while listening for connections")
                 self.stop()
                 break
+
         logger.debug("Server is no longer listening for messages")
 
     def _start_client_proc(self, client_id: str, client_soc: socket.socket):
@@ -99,20 +117,14 @@ class TCPServer:
         client_proc = ClientProcessor(client_id=client_id,
                                       client_soc=client_soc,
                                       msg_q=self._messages,
-                                      timeout=self._timeout)
+                                      timeout=self._timeout,
+                                      on_disconnect=partial(self.disconnect_client, client_id))
         client_proc.start()
         self._update_connected_clients(client_proc.id, client_proc)
 
-    def _get_is_running(self) -> bool:
-        self._is_running_lock.acquire()
-        running = self._is_running
-        self._is_running_lock.release()
-        return running
-
     def _set_is_running(self, value: bool):
-        self._is_running_lock.acquire()
-        self._is_running = value
-        self._is_running_lock.release()
+       with self._is_running_lock:
+            self._is_running = value
 
     def on_connect(self, client: TCPClient, client_id: str):
         """
@@ -133,7 +145,8 @@ class TCPServer:
         """
         Returns a boolean indicating whether the server is set up and running
         """
-        return self._get_is_running()
+        with self._is_running_lock:
+            return self._is_running
 
     @property
     def max_clients(self) -> int:
@@ -171,17 +184,16 @@ class TCPServer:
             if timeout < 0:
                 raise ValueError("Value for timeout should be a positive integer")
         self._timeout = timeout
-        self._soc.settimeout(timeout)
+        if self._soc:
+            self._soc.settimeout(timeout)
 
     @property
     def client_count(self) -> int:
         """
         Returns and int representing the number of connected clients
         """
-        self._connected_clients_lock.acquire()
-        count = len(self._connected_clients.keys())
-        self._connected_clients_lock.release()
-        return count
+        with self._connected_clients_lock:
+            return len(self._connected_clients.keys())
 
     @property
     def is_full(self) -> bool:
@@ -209,10 +221,8 @@ class TCPServer:
         """
         Returns a list with the client ids of all connected clients
         """
-        self._connected_clients_lock.acquire()
-        client_list = self._connected_clients.keys()
-        self._connected_clients_lock.release()
-        return list(client_list)
+        with self._connected_clients_lock:
+            return list(self._connected_clients.keys())
 
     def get_client_info(self, client_id: str) -> dict:
         """
@@ -234,16 +244,16 @@ class TCPServer:
         Disconnects a client with client_id. Returns False if no client with client_id was connected,
         True on a successful disconnect.
         """
-        self._connected_clients_lock.acquire()
-        try:
-            client = self._connected_clients[client_id]
-        except KeyError:
-            self._connected_clients_lock.release()
-            return False
-        del self._connected_clients[client_id]
-        self._connected_clients_lock.release()
+        with self._connected_clients_lock:
+            try:
+                client = self._connected_clients[client_id]
+            except KeyError:
+                return False
+            del self._connected_clients[client_id]
+
         if client.is_running:
-            client.stop()
+            client.stop(suppress_callback=True)
+        logger.info("Client %s has been disconnected.", client_id)
         return True
 
     def pop_msg(self, block: bool = False, timeout: int = None) -> Message | None:
@@ -263,7 +273,7 @@ class TCPServer:
         Generator for iterating over the message queue. If block is 'True', each iteration of this method will block until it
         can pop something from the queue, else it will try to get a value and yield 'None' if queue is empty. If block
         is 'True' and a timeout is given, block until timeout expires and then yield 'None' if no item was received. See
-        https://docs.python.org/3/library/queue.html#queue.Queue.get for more information
+        https://docs.python.org/3/library/queue.html#queue.Queue.get for more information.
         """
         while not self._messages.empty():
             yield self.pop_msg(block=block, timeout=timeout)
@@ -279,21 +289,23 @@ class TCPServer:
         Sends data to a connected client. Returns 'True' on successful sending, 'False' if not or if a client with
         client_id could not be found.
         """
-        self._connected_clients_lock.acquire()
-        try:
-            client = self._connected_clients[client_id]
-        except KeyError:
-            self._connected_clients_lock.release()
-            return False
-        self._connected_clients_lock.release()
-        return client.send(data)
+        with self._connected_clients_lock:
+            try:
+                client = self._connected_clients[client_id]
+            except KeyError:
+                return False
+            try:
+                return client.send(data)
+            except (ConnectionError, OSError):
+                logger.warning("Failed to send to client %s", client_id)
+                return False
 
     def start(self, addr: tuple[str, int]):
         """
         Starts the server and listens to the address provided.
         """
 
-        if self._get_is_running():
+        if self.is_running:
             return
 
         if not vet_address(addr):
@@ -308,19 +320,19 @@ class TCPServer:
             self._soc.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
         self._soc.bind(self._addr)
-        threading.Thread(target=self._mainloop).start()
+        self._soc.listen()
+        threading.Thread(target=self._mainloop, daemon=True, name="TCPServerMainLoop").start()
         logger.info("Server has been started")
 
     def stop(self):
         """
         Stops the server. If the server is not running, this method will do nothing.
         """
-        if self._get_is_running():
-            self._connected_clients_lock.acquire()
-            for client in self._connected_clients.values():
-                client.stop()
-            self._connected_clients.clear()
-            self._connected_clients_lock.release()
+        if self.is_running:
+            with self._connected_clients_lock:
+                for client in self._connected_clients.values():
+                    client.stop(suppress_callback=True)
+                self._connected_clients.clear()
             self._soc.close()
             self._soc = None
             self._set_is_running(False)

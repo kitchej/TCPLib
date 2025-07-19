@@ -83,19 +83,12 @@ class TestTCPServer:
             assert info["addr"] == client._soc.getsockname()
 
         server.disconnect_client(client_ids[0])
-        try:
-            assert server.is_full is False
-        except Exception as e:
-            assert isinstance(e, AttributeError)
-        try:
-            assert server.client_count == 9
-        except Exception as e:
-            assert isinstance(e, AttributeError)
-        server.max_clients = 0
-        assert server.max_clients == 0
+        assert server.is_full is False
+        assert server.client_count == 9
 
         server.stop()
         time.sleep(0.1)
+        server.max_clients = 0
         self.assert_default_state(server)
 
     def test_from_socket(self, client):
@@ -104,13 +97,13 @@ class TestTCPServer:
                          logging.DEBUG,
                          "test_from_socket-filehandler")
         soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        soc.bind((HOST, PORT))
 
-        s = TCPServer.from_socket(soc)
+        s = TCPServer.from_socket(soc, 10)
+        s.start((HOST, PORT))
         time.sleep(0.1)
 
         assert s._addr == (HOST, PORT)
-        assert s._max_clients == 0
+        assert s._max_clients == 10
         assert s._timeout is None
         assert isinstance(s._messages, queue.Queue)
         assert s._soc is not None
@@ -128,6 +121,7 @@ class TestTCPServer:
                          logging.DEBUG,
                          "test_mainloop_connection_error-filehandler")
 
+        error_server.start((HOST, PORT))
         time.sleep(0.1)
         dummy_client.connect((HOST, PORT))
         time.sleep(0.1)
@@ -142,6 +136,7 @@ class TestTCPServer:
                          logging.DEBUG,
                          "test_mainloop_timeout_error-filehandler")
 
+        error_server.start((HOST, PORT))
         time.sleep(0.1)
         dummy_client.connect((HOST, PORT))
         time.sleep(0.1)
@@ -149,24 +144,26 @@ class TestTCPServer:
         assert error_server._is_running
         assert error_server.client_count == 0
 
-    @pytest.mark.parametrize('error_server', [(AttributeError, "listen")], indirect=True)
+    @pytest.mark.parametrize('error_server', [(AttributeError, "accept")], indirect=True)
     def test_mainloop_attribute_error(self, error_server, dummy_client):
         add_file_handler(logger,
                          os.path.join(log_folder, "test_mainloop_attribute_error.log"),
                          logging.DEBUG,
                          "test_mainloop_attribute_error-filehandler")
 
+        error_server.start((HOST, PORT))
         time.sleep(0.1)
         assert not error_server.is_running
         assert error_server.client_count == 0
 
-    @pytest.mark.parametrize('error_server', [(OSError, "listen")], indirect=True)
+    @pytest.mark.parametrize('error_server', [(OSError, "accept")], indirect=True)
     def test_mainloop_os_error(self, error_server, dummy_client):
         add_file_handler(logger,
                          os.path.join(log_folder, "test_mainloop_os_error.log"),
                          logging.DEBUG,
                          "test_mainloop_os_error-filehandler")
 
+        error_server.start((HOST, PORT))
         time.sleep(0.1)
         assert not error_server.is_running
         assert error_server.client_count == 0
@@ -240,11 +237,61 @@ class TestTCPServer:
         time.sleep(0.1)
         assert not on_connect_server.has_messages()
 
+    def test_invalid_address(self, server):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_invalid_address.log"),
+                         logging.DEBUG,
+                         "test_invalid_address-filehandler")
+
+        with pytest.raises(ValueError):
+            server.start(("999.999.999.999", PORT))
+
+        with pytest.raises(ValueError):
+            server.start(("255.255.255.255", PORT))
+
+        with pytest.raises(ValueError):
+            server.start((HOST, 70000))
+
+    def test_start_stop_multiple_calls(self, server, client, caplog):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_reentrant_start_stop.log"),
+                         logging.DEBUG,
+                         "test_reentrant_start_stop-filehandler")
+
+        server.start((HOST, PORT))
+        time.sleep(0.1)
+        assert server.is_running
+        server.start((HOST, PORT))
+        time.sleep(0.1)
+        assert server.is_running
+
+        with caplog.at_level(logging.INFO):
+            server.stop()
+            time.sleep(0.1)
+            server.stop()
+            time.sleep(0.1)
+
+        assert len([record for record in caplog.records if "Server has been stopped" in record.msg]) == 1
+
+    def test_client_disconnect_updates_server_state(self, server, client):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_client_disconnect_updates_server_state.log"),
+                         logging.DEBUG,
+                         "test_client_disconnect_updates_server_state-filehandler")
 
 
+        server.start((HOST, PORT))
+        time.sleep(0.1)
+        client.connect((HOST, PORT))
+        time.sleep(0.1)
 
+        assert server.client_count == 1
 
+        client.disconnect()
+        time.sleep(0.1)
 
+        assert server.client_count == 0
 
+        server.stop()
 
 

@@ -501,8 +501,14 @@ class TestTCPClient:
                          logging.DEBUG,
                          "test_context_manager-filehandler")
 
+        def recv_loop(server):
+            try:
+                server.soc.recv(1024)
+            except AttributeError:
+                return
+
         dummy_server.start()
-        threading.Thread(target=lambda: dummy_server.soc.recv(1024)).start()
+        threading.Thread(target=recv_loop, args=[dummy_server]).start()
         with TCPClient() as client:
             client.connect((HOST, PORT))
             time.sleep(0.1)

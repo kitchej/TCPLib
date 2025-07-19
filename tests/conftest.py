@@ -38,6 +38,9 @@ def pytest_collection_modifyitems(items):
                        [it for it in sorted_items if class_mapping[it] != class_]
     items[:] = sorted_items
 
+    for item in items:
+        item.add_marker(pytest.mark.timeout(20))
+
 
 def setup_log_folder(folder_name):
     log_folder = os.path.join("logs", folder_name)
@@ -127,7 +130,6 @@ def error_client_processor(request, dummy_server):
 @pytest.fixture
 def error_server(request):
     soc = dummy_soc.SocRaiseErr(excep=request.param[0], func_to_fail=request.param[1])
-    soc.bind((HOST, PORT))
     s = TCPServer.from_socket(soc)
     yield s
     s.stop()

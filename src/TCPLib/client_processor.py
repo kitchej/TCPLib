@@ -7,6 +7,7 @@ import logging
 import socket
 import threading
 import queue
+from functools import partial
 
 from .message import Message
 from .tcp_client import TCPClient
@@ -17,9 +18,15 @@ logger = logging.getLogger(__name__)
 class ClientProcessor:
     """
     Maintains a single TCP/IP client connection.
+    Pass a callback to on_disconnect to enable certain actions to be taken when stop() is called.
     """
 
-    def __init__(self, client_id, client_soc: socket.socket, msg_q: queue.Queue, buff_size=4096, timeout: int | None = None):
+    def __init__(self, client_id,
+                 client_soc: socket.socket,
+                 msg_q: queue.Queue,
+                 buff_size=4096,
+                 timeout: int | None = None,
+                 on_disconnect: partial | None = None):
         self._client_id = client_id
         self._tcp_client = TCPClient.from_socket(client_soc)
         self._tcp_client.timeout = timeout
@@ -29,9 +36,13 @@ class ClientProcessor:
         self._is_running = False
         self._thread = None
         self._is_running_lock = threading.Lock()
+        self._on_disconnect = on_disconnect
+
+    def __repr__(self):
+        return f"<ClientProcessor remote_addr={self._remote_addr} running={self.is_running} client_id={self._client_id}>"
 
     def _receive_loop(self):
-        logger.debug("Client %s is listening for new messages from %s @ %d",
+        logger.debug("Client %s has started _receive_loop() and is listening for new messages from %s @ %d",
                      self._client_id, self.remote_addr[0], self.remote_addr[1])
         self._set_is_running(True)
         while self.is_running:
@@ -42,11 +53,14 @@ class ClientProcessor:
                 self.stop()
                 return
             except TimeoutError:
-                logger.exception("Timed out while receiving from %s @ %d", self.remote_addr[0], self.remote_addr[1])
-                self.stop()
-                return
+                logger.error("Timed out while receiving from %s @ %d", self.remote_addr[0], self.remote_addr[1])
+                continue
             except ConnectionError:
-                logger.exception("Connection error while receiving from %s @ %d", self.remote_addr[0], self.remote_addr[1])
+                # Since this thread runs in the background, it is common to get connection errors during normal operations
+                # since disconnecting can happen outside this thread. For this reason, we only need to log this exception
+                # during debugging
+                if logger.level == logging.DEBUG:
+                    logger.exception("Connection error while receiving from %s @ %d", self.remote_addr[0], self.remote_addr[1])
                 self.stop()
                 return
             except OSError:
@@ -122,18 +136,27 @@ class ClientProcessor:
             return
 
         if self._thread is None:
-            self._thread = threading.Thread(target=self._receive_loop, daemon=True)
+            self._thread = threading.Thread(target=self._receive_loop,
+                                            daemon=True,
+                                            name=f"TCPServerClientProc#{self._client_id}")
             self._thread.start()
             logger.info("Processing connection to %s @ %d as client #%s", self.remote_addr[0],
                     self.remote_addr[1], self._client_id)
 
-    def stop(self):
+    def stop(self, suppress_callback=False):
         """
         Stops the client processor. If the processor is not running, this method does nothing.
+        Set suppress_callback to True to disable on_disconnect callback. This can help prevent deadlocks in cases where
+        the same lock needs to be acquired by both the caller and the callback.
         """
         if self.is_running:
             self._set_is_running(False)
             if self._thread:
-                self._thread.join(timeout=1) # Wait for _receive_loop to quit on its own
+                try:
+                    self._thread.join(timeout=1) # Wait for _receive_loop to quit on its own...
+                except RuntimeError: # ...unless it already quit
+                    pass
             self._tcp_client.disconnect()
-            logger.info("Client %s has been stopped.", self._client_id)
+            if self._on_disconnect is not None and not suppress_callback:
+                self._on_disconnect()
+            logger.debug("Client %s has been stopped.", self._client_id)

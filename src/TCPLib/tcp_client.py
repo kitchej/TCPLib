@@ -24,22 +24,27 @@ class TCPClient:
         self._timeout = timeout
         self._is_connected = False
         self._is_host = False
-        self._last_connected_peer = None # Be aware, this is not necessarily the currently connected peer!
+        self._last_connected_peer = (None, None)
 
-    '''TODO: Write some tests to make sure these are working properly'''
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.disconnect()
 
+    def __repr__(self):
+        return (f"<TCPClient local_addr={self._local_addr} "
+                f"peer_addr={self._peer_addr} "
+                f"is_connected={self.is_connected} "
+                f"is_host={self.is_host}>")
+
     @classmethod
     def from_socket(cls, soc: socket.socket, is_listen_soc=False) -> "TCPClient":
         """
-        Allows for a client to be created from a socket object. Socket must be initialized and connected. Timeout value
-        for the socket is overridden when connect() or host_single_client() is called to ensure class consistency.
-        Returns new TCPClient object. NOTE: if socket.bind() is called before passing to this method, host_single_client
-        will raise OSError.
+        Allows for a client to be created from a socket object. Timeout value for the socket is overridden when
+        connect() or host_single_client() is called to ensure class consistency. Returns new TCPClient object.
+        NOTE: if bind() or listen() is called on the socket before host_single_client() or connect() is called,
+        both methods will raise an exception.
         """
         out = cls(soc.gettimeout())
         if is_listen_soc:
