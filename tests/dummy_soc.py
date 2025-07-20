@@ -12,34 +12,14 @@ class OnConnectServer(TCPServer):
         return False
 
 
-class ConfigurableClient:
-    def __init__(self, host, port):
-        self.soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.soc.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.host_addr = (host, port)
-
-    def send(self, data: bytes):
-        self.soc.sendall(data)
-
-    def connect(self):
-        self.soc.connect(self.host_addr)
-
-    def close(self):
-        if self.soc is not None:
-            self.soc.close()
-            self.soc = None
-
-
-class DummyServer(ConfigurableClient):
-    def __init__(self, host, port):
-        ConfigurableClient.__init__(self, host, port)
+class DummyServer:
+    def __init__(self):
         self.soc = None
         self.listen_soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.listen_soc.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.listen_soc.bind((host, port))
         self.server_ready = threading.Event()
 
-    def listen(self, delay):
+    def listen(self):
         try:
             self.listen_soc.listen()
             self.server_ready.set()
@@ -48,16 +28,24 @@ class DummyServer(ConfigurableClient):
         except OSError:
             return
 
-    def start(self, delay=0):
-        threading.Thread(target=self.listen, args=[delay]).start()
-        self.server_ready.wait()
+    def send(self, data: bytes):
+        self.soc.sendall(data)
 
+    def start(self, addr):
+        self.listen_soc.bind(addr)
+        threading.Thread(target=self.listen).start()
+        self.server_ready.wait()
 
     def stop(self):
         if self.listen_soc:
             self.listen_soc.close()
         if self.soc:
             self.soc.close()
+
+        self.soc = None
+        self.listen_soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.listen_soc.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.server_ready = threading.Event()
 
 
 class SocRaiseErr(socket.socket):

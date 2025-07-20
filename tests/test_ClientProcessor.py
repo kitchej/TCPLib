@@ -23,17 +23,15 @@ class TestClientProcessor:
         assert processor._buff_size == 4096
         assert processor._is_running is False
 
-    def recv_loop_raise_exception(self, proc, c):
-        try:
-            proc.start()
-            while not proc.is_running:
-                pass
-            time.sleep(0.1)
-            c.sendall(b"Hello World!")
-        except Exception as e:
-            assert isinstance(e, c.excep)
-            time.sleep(0.1)
-            self.assert_default_state(proc)
+    @staticmethod
+    def recv_loop_raise_exception(proc, c):
+        proc.start()
+        while not proc.is_running:
+            pass
+        time.sleep(0.1)
+        c.sendall(b"Hello World!")
+        time.sleep(0.1)
+
 
     def test_class_state(self, client_processor):
         add_file_handler(logger,
@@ -57,10 +55,8 @@ class TestClientProcessor:
         assert processor._is_running is True
 
         assert processor.id == DUMMY_ID
-        try:
+        with pytest.raises(AttributeError):
             processor.id = " "
-        except Exception as e:
-            assert isinstance(e, AttributeError)
 
         assert processor.timeout is None
         processor.timeout = 10
@@ -69,62 +65,103 @@ class TestClientProcessor:
         assert processor.timeout is None
 
         assert processor.remote_addr == client.getsockname()
-        try:
+        with pytest.raises(AttributeError):
             processor.remote_addr = ("111.111.111", 1000)
-        except Exception as e:
-            assert isinstance(e, AttributeError)
 
         assert processor.is_running is True
-        try:
+        with pytest.raises(AttributeError):
             processor.is_running = False
-        except Exception as e:
-            assert isinstance(e, AttributeError)
 
         processor.stop()
         self.assert_default_state(processor)
 
+
+    """Test error handling in _receive_loop"""
+
     @pytest.mark.parametrize('error_client_processor', [(AttributeError, "recv")], indirect=True)
-    def test_recv_loop_raise_AttributeError(self, error_client_processor):
+    def test_recv_loop_raise_attribute_error(self, error_client_processor):
         add_file_handler(logger,
-                         os.path.join(log_folder, "raise_AttributeError.log"),
+                         os.path.join(log_folder, "test_recv_loop_raise_attribute_error.log"),
                          logging.DEBUG,
-                         "raise_AttributeError-filehandler")
+                         "test_recv_loop_raise_attribute_error-filehandler")
 
-        self.recv_loop_raise_exception(error_client_processor[0], error_client_processor[1])
+        time.sleep(0.1)
+        self.assert_default_state(error_client_processor[0])
 
-    @pytest.mark.parametrize('error_client_processor', [(TimeoutError, "recv")], indirect=True)
-    def test_recv_loop_raise_TimeoutError(self, error_client_processor):
+    def test_recv_loop_raise_timeout_error(self, client_processor, caplog):
         add_file_handler(logger,
-                         os.path.join(log_folder, "raise_TimeoutError.log"),
+                         os.path.join(log_folder, "test_recv_loop_raise_timeout_error.log"),
                          logging.DEBUG,
-                         "raise_TimeoutError-filehandler")
+                         "test_recv_loop_raise_timeout_error-filehandler")
 
-        self.recv_loop_raise_exception(error_client_processor[0], error_client_processor[1])
+        proc = client_processor[0]
+        proc.timeout = 0.5
+        with caplog.at_level(logging.WARNING):
+            proc.start()
+            while not proc.is_running:
+                continue
+            # Wait up to 2 seconds for the expected log record to appear
+            timeout = time.time() + 2
+            found = False
+            expected = f"Timed out while receiving from"
+            while time.time() < timeout:
+                if any(expected in record.msg for record in caplog.records):
+                    found = True
+                    break
+                time.sleep(0.05)
+
+            assert found
+
+
+    def test_recv_loop_zero_max_timeouts(self, client_processor, caplog):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_recv_loop_raise_timeout_error.log"),
+                         logging.DEBUG,
+                         "test_recv_loop_raise_timeout_error-filehandler")
+
+        proc = client_processor[0]
+        proc.timeout = 0.1
+        proc.max_timeouts = 0
+        with caplog.at_level(logging.ERROR):
+            proc.start()
+            while not proc.is_running:
+                continue
+            # Wait up to 2 seconds for the expected log record to appear
+            timeout = time.time() + 3
+            found = False
+            expected = f"timed out too many times. Disconnecting."
+            while time.time() < timeout:
+                if any(expected in record.msg for record in caplog.records):
+                    found = True
+                    break
+                time.sleep(0.05)
+
+            assert found
 
     @pytest.mark.parametrize('error_client_processor', [(ConnectionError, "recv")], indirect=True)
-    def test_recv_loop_raise_ConnectionError(self, error_client_processor):
+    def test_recv_loop_raise_connection_error(self, error_client_processor):
         add_file_handler(logger,
-                         os.path.join(log_folder, "raise_ConnectionError.log"),
+                         os.path.join(log_folder, "test_recv_loop_raise_connection_error.log"),
                          logging.DEBUG,
-                         "raise_ConnectionError-filehandler")
+                         "test_recv_loop_raise_connection_error-filehandler")
 
         self.recv_loop_raise_exception(error_client_processor[0], error_client_processor[1])
 
     @pytest.mark.parametrize('error_client_processor', [(socket.gaierror, "recv")], indirect=True)
-    def test_recv_loop_raise_gaierror(self, error_client_processor):
+    def test_recv_loop_raise_gai_error(self, error_client_processor):
         add_file_handler(logger,
-                         os.path.join(log_folder, "raise_gaierror.log"),
+                         os.path.join(log_folder, "test_recv_loop_raise_gai_error.log"),
                          logging.DEBUG,
-                         "raise_gaierror-filehandler")
+                         "test_recv_loop_raise_gai_error-filehandler")
 
         self.recv_loop_raise_exception(error_client_processor[0], error_client_processor[1])
 
     @pytest.mark.parametrize('error_client_processor', [(OSError, "recv")], indirect=True)
-    def test_recv_loop_raise_OSError(self, error_client_processor):
+    def test_recv_loop_raise_os_error(self, error_client_processor):
         add_file_handler(logger,
-                         os.path.join(log_folder, "raise_OSError.log"),
+                         os.path.join(log_folder, "test_recv_loop_raise_os_error.log"),
                          logging.DEBUG,
-                         "raise_OSError-filehandler")
+                         "test_recv_loop_raise_os_error-filehandler")
 
         self.recv_loop_raise_exception(error_client_processor[0], error_client_processor[1])
 

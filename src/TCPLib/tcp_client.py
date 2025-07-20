@@ -16,7 +16,7 @@ class TCPClient:
     A simple TCP client that can connect to a TCP/IP host
     """
 
-    def __init__(self, timeout: int = None):
+    def __init__(self, timeout: int = None, is_component=False):
         self._soc = None
         self._listen_soc = None
         self._peer_addr = None
@@ -25,6 +25,12 @@ class TCPClient:
         self._is_connected = False
         self._is_host = False
         self._last_connected_peer = (None, None)
+        # Indicates that TCPClient is a member of another class. This will supress log messages in
+        self._is_component = is_component
+
+
+
+        # that already logs the same errors
 
     def __enter__(self):
         return self
@@ -39,7 +45,7 @@ class TCPClient:
                 f"is_host={self.is_host}>")
 
     @classmethod
-    def from_socket(cls, soc: socket.socket, is_listen_soc=False) -> "TCPClient":
+    def from_socket(cls, soc: socket.socket, is_listen_soc=False, is_component=False) -> "TCPClient":
         """
         Allows for a client to be created from a socket object. Timeout value for the socket is overridden when
         connect() or host_single_client() is called to ensure class consistency. Returns new TCPClient object.
@@ -60,6 +66,7 @@ class TCPClient:
         except OSError:  # Not connected
             return out
         out._is_connected = True
+        out._is_component = is_component
         return out
 
     def _clean_up(self):
@@ -84,8 +91,9 @@ class TCPClient:
         self._is_connected = False
         self._is_host = False
 
-    def _handle_error(self, exception, log_msg, *log_args):
-        logger.exception(log_msg, *log_args)
+    def _handle_error(self, exception: Exception, log_msg: str, *log_args):
+        if not self._is_component:
+            logger.exception(log_msg, *log_args)
         self._clean_up()
         raise exception
 
@@ -156,9 +164,9 @@ class TCPClient:
         try:
             self._listen_soc.bind(self._local_addr)
         except socket.gaierror as e:
-            self._handle_error(e,"Could not resolve address %s @ %d", self._local_addr[0], self._local_addr[1])
+            self._handle_error(e, "Could not resolve address %s @ %d", self._local_addr[0], self._local_addr[1])
         except OSError as e:
-            self._handle_error(e,"Exception while binding to %s @ %d", self._local_addr[0], self._local_addr[1])
+            self._handle_error(e, "Exception while binding to %s @ %d", self._local_addr[0], self._local_addr[1])
 
         logger.info("Listening for connections on %s @ %d", self._local_addr[0], self._local_addr[1])
         try:
@@ -171,9 +179,9 @@ class TCPClient:
             self._is_host = True
             logger.info("Accepted connection from %s @ %d", client_addr[0], client_addr[1])
         except TimeoutError as e:
-            self._handle_error(e,"Timed out while attempting to connect to remote client")
+            self._handle_error(e, "Timed out while attempting to connect to remote client")
         except ConnectionError as e:
-            self._handle_error(e,"Failed to establish connection to remote client")
+            self._handle_error(e, "Failed to establish connection to remote client")
         self._listen_soc.close()
         self._listen_soc = None
         return
@@ -207,18 +215,37 @@ class TCPClient:
             self._local_addr = self._soc.getsockname()
             logger.info("Successfully connected to %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
         except TimeoutError as e:
-            self._handle_error(e,"Timed out while attempting to connect to %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
+            self._handle_error(e, "Timed out while attempting to connect to %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
         except ConnectionError as e:
-            self._handle_error(e,"Could not connect to %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
+            self._handle_error(e, "Could not connect to %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
         except socket.gaierror as e:
-            self._handle_error(e,"Could not resolve address %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
+            self._handle_error(e, "Could not resolve address %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
         except OSError as e:
-            self._handle_error(e,"OSError while connecting to %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
+            self._handle_error(e, "OSError while connecting to %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
+
+    def reconnect(self):
+        """
+        Attempts to reconnect to the last connected peer. Raises ConnectionError if this class has not
+        connected to any peers previously.
+        Raises ConnectionError, TimeoutError, OSError, and socket.gaierror
+
+        """
+        if not self._last_connected_peer[0] or not self._last_connected_peer[1]:
+            raise ConnectionError("No previous connection available to reconnect to")
+
+        self.disconnect()
+        try:
+            self.connect(self._last_connected_peer)
+        except (TimeoutError, ConnectionError, OSError, socket.gaierror) as e:
+            logger.warning("Reconnect attempt to %s @ %d failed",
+                           self._last_connected_peer[0], self._last_connected_peer[1])
+            raise e
 
     def disconnect(self):
         """Disconnect from the currently connected host. If no connection is opened, this method does nothing."""
         if self._is_connected:
             self._clean_up()
+            if self._is_component
             logger.info("Disconnected from %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
 
     def send_bytes(self, data: bytes) -> bool:
@@ -232,11 +259,13 @@ class TCPClient:
             self._clean_up()
             return False
         except TimeoutError as e:
-            self._handle_error(e,"Timed out while sending to %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
+            if not self._is_component:
+                logger.warning(e, "Timed out while sending from %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
+            raise e
         except ConnectionError as e:
             self._handle_error(e, "Connection error while sending to %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
         except OSError as e:
-            self._handle_error(e,"OSError while sending to %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
+            self._handle_error(e, "OSError while sending to %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
 
     def send(self, data: bytes) -> bool:
         """Send raw bytes with a 4 byte size header attached. Raises TimeoutError, ConnectionError, and OSError."""
@@ -244,7 +273,7 @@ class TCPClient:
             raise ConnectionError("Client is not connected to a host")
         return self.send_bytes(encode_msg(data))
 
-    def receive_bytes(self, size: int) -> bytes:
+    def receive_bytes(self, size: int, suppress_logs=False) -> bytes:
         """
         Receive only the number of bytes specified. Returns an empty bytes-like object on failure or closed connection.
         Raises TimeoutError, ConnectionError, and OSError.
@@ -260,14 +289,16 @@ class TCPClient:
             self._clean_up()
             return bytes(0)
         except TimeoutError as e:
-            self._handle_error(e,"Timed out while receiving to %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
+            if not suppress_logs:
+                logger.warning(e, "Timed out while receiving from %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
+            raise e
         except ConnectionError as e:
-            self._handle_error(e,"Connection error while receiving from %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
+            self._handle_error(e, "Connection error while receiving from %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
         except OSError as e:
-            self._handle_error(e,"OSError while receiving from %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
+            self._handle_error(e, "OSError while receiving from %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
 
 
-    def iter_receive(self, buff_size: int = 4096) -> Generator:
+    def iter_receive(self, buff_size: int = 4096, suppress_logs=False) -> Generator:
         """
         Returns a generator for iterating over the bytes of an incoming message. An integer representing the message
         size is yielded first. Subsequent calls yield the contents of the message as it is received. Raises
@@ -295,14 +326,14 @@ class TCPClient:
             if not data:
                 logger.debug("Failed to complete reception of message from %s @ %d. %d/%d bytes received",
                              self._last_connected_peer[0], self._last_connected_peer[1], bytes_recv, size)
-                raise StopIteration
+                return
             bytes_recv += len(data)
             remaining = size - bytes_recv
             if remaining < buff_size:
                 buff_size = remaining
             yield data
 
-    def receive(self, buff_size: int = 4096) -> bytearray:
+    def receive(self, buff_size: int = 4096, suppress_logs=False) -> bytearray:
         """
         Receive raw bytes. Expects a 4 bytes size header to be attached. Returns a bytearray. Returns an empty bytearray
         on failure or closed connection. Raises TimeoutError, ConnectionError, and OSError.
@@ -311,7 +342,7 @@ class TCPClient:
             raise ConnectionError("Client is not connected to a host")
         if buff_size <= 0:
             raise ValueError("'buff_size' argument must be a non-zero, positive integer")
-        gen = self.iter_receive(buff_size)
+        gen = self.iter_receive(buff_size, suppress_logs=suppress_logs)
         if not gen:
             return bytearray()
         try:
@@ -321,6 +352,7 @@ class TCPClient:
         data = bytearray()
         for chunk in gen:
             if not chunk:
+                logger.warning("Partial message received from %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
                 return data
             data.extend(chunk)
         logger.debug("Received a total of %d bytes from %s @ %d", len(data), self._last_connected_peer[0], self._last_connected_peer[1])

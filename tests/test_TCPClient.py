@@ -3,6 +3,7 @@ import time
 import logging
 import os
 import socket
+
 import pytest
 
 from globals_for_tests import setup_log_folder, HOST, PORT
@@ -29,40 +30,37 @@ class TestTCPClient:
 
     @staticmethod
     def assert_excep_raised_on_connect(c, excep):
-        try:
+        with pytest.raises(excep):
             c.connect((HOST, PORT))
-        except Exception as e:
-            assert isinstance(e, excep)
+
+    @staticmethod
+    def assert_excep_raised_on_reconnect(c, excep):
+        with pytest.raises(excep):
+            c.reconnect()
 
     @staticmethod
     def assert_excep_raised_on_send(c, excep):
         c.connect((HOST, PORT))
-        try:
+        with pytest.raises(excep):
             c.send(b"Hello World!")
-        except Exception as e:
-            assert isinstance(e, excep)
 
     @staticmethod
     def assert_excep_raised_on_recv(c, excep):
         c.connect((HOST, PORT))
-        try:
+        with pytest.raises(excep):
             c.receive()
-        except Exception as e:
-            assert isinstance(e, excep)
 
     @staticmethod
     def assert_excep_raised_on_host_single_client(c, excep):
-        try:
+        with pytest.raises(excep):
             c.host_single_client((HOST, PORT), 5)
-        except Exception as e:
-            assert isinstance(e, excep)
 
     def test_class_state(self, client, dummy_server):
         add_file_handler(logger,
                          os.path.join(log_folder, "test_class_state.log"),
                          logging.DEBUG,
                          "test_class_state-filehandler")
-        dummy_server.start()
+        dummy_server.start((HOST, PORT))
 
         self.assert_default_state(client)
 
@@ -76,10 +74,9 @@ class TestTCPClient:
         assert client._is_connected
         assert client._is_host is False
 
-        try:
+        with pytest.raises(AttributeError):
             client.is_connected = False
-        except Exception as e:
-            assert isinstance(e, AttributeError)
+
         assert client.is_connected
 
         assert client.timeout is None
@@ -89,17 +86,13 @@ class TestTCPClient:
         client.timeout = None
 
         assert client.peer_addr == (HOST, PORT)
-        try:
+        with pytest.raises(AttributeError):
             client.peer_addr = ("192.168.010", 6000)
-        except Exception as e:
-            assert isinstance(e, AttributeError)
         assert client.peer_addr == (HOST, PORT)
 
         assert client.is_host is False
-        try:
+        with pytest.raises(AttributeError):
             client.is_host = True
-        except Exception as e:
-            assert isinstance(e, AttributeError)
         assert client.is_host is False
 
         client.disconnect()
@@ -111,7 +104,7 @@ class TestTCPClient:
                          logging.DEBUG,
                          "test_from_socket-filehandler")
         soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        dummy_server.start()
+        dummy_server.start((HOST, PORT))
         soc.connect((HOST, PORT))
         c = TCPClient.from_socket(soc)
 
@@ -133,10 +126,8 @@ class TestTCPClient:
                          "test_host_single_client-filehandler")
         self.assert_default_state(client)
 
-        try:
+        with pytest.raises(TimeoutError):
             client.host_single_client((HOST, PORT), timeout=0.1)
-        except Exception as e:
-            assert isinstance(e, TimeoutError)
 
         threading.Thread(target=client.host_single_client, args=[(HOST, PORT), 5]).start()
         time.sleep(0.1)
@@ -184,6 +175,72 @@ class TestTCPClient:
 
         dummy_client.close()
         client.disconnect()
+
+    def test_reconnect(self, dummy_server, client):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_reconnect.log"),
+                         logging.DEBUG,
+                         "test_reconnect-filehandler")
+
+        with pytest.raises(ConnectionError) as exc_info:
+            client.reconnect()
+
+        assert "No previous connection available to reconnect to" in exc_info.__str__()
+
+        dummy_server.start((HOST, PORT))
+        client.connect((HOST, PORT))
+        time.sleep(0.1)
+        assert client.is_connected
+        client.disconnect()
+        assert not client.is_connected
+        dummy_server.stop()
+
+        dummy_server.start((HOST, PORT))
+        client.reconnect()
+        assert client.is_connected
+
+    """Test exceptions in reconnect"""
+
+    @pytest.mark.parametrize('error_reconnect_client', [(TimeoutError, "connect")], indirect=True)
+    def test_reconnect_timeout_error(self, error_reconnect_client):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_reconnect_timeout_error.log"),
+                         logging.DEBUG,
+                         "test_reconnect_timeout_error-filehandler")
+
+        self.assert_excep_raised_on_reconnect(error_reconnect_client, error_reconnect_client._soc.excep)
+        self.assert_default_state(error_reconnect_client)
+
+    @pytest.mark.parametrize('error_reconnect_client', [(ConnectionError, "connect")], indirect=True)
+    def test_reconnect_connection_error(self, error_reconnect_client):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_reconnect_connection_error.log"),
+                         logging.DEBUG,
+                         "test_reconnect_connection_error-filehandler")
+
+        self.assert_excep_raised_on_reconnect(error_reconnect_client, error_reconnect_client._soc.excep)
+        self.assert_default_state(error_reconnect_client)
+
+    @pytest.mark.parametrize('error_reconnect_client', [(OSError, "connect")], indirect=True)
+    def test_reconnect_os_error(self, error_reconnect_client):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_reconnect_os_error.log"),
+                         logging.DEBUG,
+                         "test_reconnect_os_error-filehandler")
+
+        self.assert_excep_raised_on_reconnect(error_reconnect_client, error_reconnect_client._soc.excep)
+        self.assert_default_state(error_reconnect_client)
+
+    @pytest.mark.parametrize('error_reconnect_client', [(socket.gaierror, "connect")], indirect=True)
+    def test_reconnect_gai_error(self, error_reconnect_client):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_reconnect_gai_error.log"),
+                         logging.DEBUG,
+                         "test_reconnect_gai_error-filehandler")
+
+        self.assert_excep_raised_on_reconnect(error_reconnect_client, error_reconnect_client._soc.excep)
+        self.assert_default_state(error_reconnect_client)
+
 
     """Test exceptions in TCPClient.host_single_client()"""
 
@@ -274,14 +331,18 @@ class TestTCPClient:
     @pytest.mark.parametrize('error_client', [(AttributeError, "sendall")], indirect=True)
     def test_send_attribute_error(self, error_client, dummy_server):
         add_file_handler(logger,
-                         os.path.join(log_folder, "test_send_attribute_error.log"),
+                         os.path.join(log_folder, "test_send_timeout_error.log"),
                          logging.DEBUG,
-                         "test_send_attribute_error-filehandler")
+                         "test_send_timeout_error-filehandler")
 
-        dummy_server.start()
+        dummy_server.start((HOST, PORT))
 
-        self.assert_excep_raised_on_send(error_client, error_client._soc.excep)
+        error_client.connect((HOST, PORT))
+        time.sleep(0.1)
+        assert error_client.send(b"Hello World!") == False
+
         self.assert_default_state(error_client)
+
 
     @pytest.mark.parametrize('error_client', [(TimeoutError, "sendall")], indirect=True)
     def test_send_timeout_error(self, error_client, dummy_server):
@@ -290,7 +351,7 @@ class TestTCPClient:
                          logging.DEBUG,
                          "test_send_timeout_error-filehandler")
 
-        dummy_server.start()
+        dummy_server.start((HOST, PORT))
 
         self.assert_excep_raised_on_send(error_client, error_client._soc.excep)
         self.assert_default_state(error_client)
@@ -302,7 +363,7 @@ class TestTCPClient:
                          logging.DEBUG,
                          "test_send_connection_error-filehandler")
 
-        dummy_server.start()
+        dummy_server.start((HOST, PORT))
 
         self.assert_excep_raised_on_send(error_client, error_client._soc.excep)
         self.assert_default_state(error_client)
@@ -314,21 +375,9 @@ class TestTCPClient:
                          logging.DEBUG,
                          "test_send_os_error-filehandler")
 
-        dummy_server.start()
+        dummy_server.start((HOST, PORT))
 
         self.assert_excep_raised_on_send(error_client, error_client._soc.excep)
-        self.assert_default_state(error_client)
-
-    @pytest.mark.parametrize('error_client', [(AttributeError, "recv")], indirect=True)
-    def test_recv_attribute_error(self, error_client, dummy_server):
-        add_file_handler(logger,
-                         os.path.join(log_folder, "test_recv_attribute_error.log"),
-                         logging.DEBUG,
-                         "test_recv_attribute_error-filehandler")
-
-        dummy_server.start()
-
-        self.assert_excep_raised_on_recv(error_client, error_client._soc.excep)
         self.assert_default_state(error_client)
 
     @pytest.mark.parametrize('error_client', [(TimeoutError, "recv")], indirect=True)
@@ -338,7 +387,7 @@ class TestTCPClient:
                          logging.DEBUG,
                          "test_recv_timeout_error-filehandler")
 
-        dummy_server.start()
+        dummy_server.start((HOST, PORT))
 
         self.assert_excep_raised_on_recv(error_client, error_client._soc.excep)
         self.assert_default_state(error_client)
@@ -350,7 +399,7 @@ class TestTCPClient:
                          logging.DEBUG,
                          "test_recv_connection_error-filehandler")
 
-        dummy_server.start()
+        dummy_server.start((HOST, PORT))
 
         self.assert_excep_raised_on_recv(error_client, error_client._soc.excep)
         self.assert_default_state(error_client)
@@ -362,7 +411,7 @@ class TestTCPClient:
                          logging.DEBUG,
                          "test_recv_os_error-filehandler")
 
-        dummy_server.start()
+        dummy_server.start((HOST, PORT))
 
         self.assert_excep_raised_on_recv(error_client, error_client._soc.excep)
         self.assert_default_state(error_client)
@@ -380,7 +429,7 @@ class TestTCPClient:
         with open("tests/dummy_files/doi.txt", 'rb') as file:
             text = file.read()
 
-        dummy_server.start()
+        dummy_server.start((HOST, PORT))
         client.connect((HOST, PORT))
 
         client.send(msg1)
@@ -407,7 +456,7 @@ class TestTCPClient:
                          logging.DEBUG,
                          "test_recv_chunk-filehandler")
 
-        dummy_server.start()
+        dummy_server.start((HOST, PORT))
         client.connect((HOST, PORT))
         time.sleep(0.1)
 
@@ -430,7 +479,7 @@ class TestTCPClient:
                          "test_iter_receive-filehandler")
 
         msg = b"Hello World!"
-        dummy_server.start()
+        dummy_server.start((HOST, PORT))
         client.connect((HOST, PORT))
         time.sleep(0.1)
 
@@ -455,7 +504,7 @@ class TestTCPClient:
         with open("tests/dummy_files/doi.txt", 'rb') as file:
             text = file.read()
 
-        dummy_server.start()
+        dummy_server.start((HOST, PORT))
         client.connect((HOST, PORT))
         time.sleep(0.1)
 
@@ -483,7 +532,7 @@ class TestTCPClient:
         with open("tests/dummy_files/photo.jpg", 'rb') as file:
             photo = file.read()
 
-        dummy_server.start()
+        dummy_server.start((HOST, PORT))
         client.connect((HOST, PORT))
         time.sleep(0.1)
 
@@ -507,7 +556,7 @@ class TestTCPClient:
             except AttributeError:
                 return
 
-        dummy_server.start()
+        dummy_server.start((HOST, PORT))
         threading.Thread(target=recv_loop, args=[dummy_server]).start()
         with TCPClient() as client:
             client.connect((HOST, PORT))
@@ -526,7 +575,7 @@ class TestTCPClient:
                          logging.DEBUG,
                          "test_connect_called_twice-filehandler")
 
-        dummy_server.start()
+        dummy_server.start((HOST, PORT))
         client.connect((HOST, PORT))
 
         client.connect(("127.0.0.1", 5001))
@@ -557,7 +606,7 @@ class TestTCPClient:
         with caplog.at_level(logging.INFO):
             client.disconnect()
 
-            dummy_server.start()
+            dummy_server.start((HOST, PORT))
             client.connect((HOST, PORT))
 
             client.disconnect()
@@ -586,25 +635,17 @@ class TestTCPClient:
                          os.path.join(log_folder, "test_connect_invalid_ip.log"),
                          logging.DEBUG,
                          "test_connect_invalid_ip-filehandler")
-        try:
+        with pytest.raises(ValueError):
             client.connect(("999.999.999.999", 5000))
-        except Exception as e:
-            assert isinstance(e, ValueError)
 
-        try:
+        with pytest.raises(ValueError):
             client.connect(("127.0.0.1", 65536))
-        except Exception as e:
-            assert isinstance(e, ValueError)
 
-        try:
+        with pytest.raises(ValueError):
             client.connect(("0.0.0.0", 5000))
-        except Exception as e:
-            assert isinstance(e, ValueError)
 
-        try:
+        with pytest.raises(ValueError):
             client.connect(("255.255.255.255", 5000))
-        except Exception as e:
-            assert isinstance(e, ValueError)
 
 
     def test_host_single_client_twice(self, dummy_client, client):
@@ -630,20 +671,14 @@ class TestTCPClient:
                          os.path.join(log_folder, "test_host_single_client_invalid_ip.log"),
                          logging.DEBUG,
                          "test_host_single_client_invalid_ip-filehandler")
-        try:
+        with pytest.raises(ValueError):
             client.host_single_client(("999.999.999.999", 5000), 5)
-        except Exception as e:
-            assert isinstance(e, ValueError)
 
-        try:
+        with pytest.raises(ValueError):
             client.host_single_client(("127.0.0.1", 65536), 5)
-        except Exception as e:
-            assert isinstance(e, ValueError)
 
-        try:
+        with pytest.raises(ValueError):
             client.host_single_client(("255.255.255.255", 5000), 5)
-        except Exception as e:
-            assert isinstance(e, ValueError)
 
 
     def test_set_negative_timeout(self, client):
@@ -651,10 +686,8 @@ class TestTCPClient:
                          os.path.join(log_folder, "test_set_negative_timeout.log"),
                          logging.DEBUG,
                          "test_set_negative_timeout-filehandler")
-        try:
+        with pytest.raises(ValueError):
             client.timeout = -1
-        except Exception as e:
-            assert isinstance(e, ValueError)
 
     def test_timeout_applies_after_connect(self, dummy_server, client):
         add_file_handler(logger,
@@ -662,7 +695,7 @@ class TestTCPClient:
                          logging.DEBUG,
                          "test_timeout_applies_after_connect-filehandler")
         client.timeout = 5
-        dummy_server.start()
+        dummy_server.start((HOST, PORT))
         client.connect((HOST, PORT))
         assert client._soc.gettimeout() == 5
 
@@ -673,40 +706,31 @@ class TestTCPClient:
                          logging.DEBUG,
                          "test_receive_buffsize_zero-filehandler")
 
-        dummy_server.start()
+        dummy_server.start((HOST, PORT))
         client.connect((HOST, PORT))
 
-        try:
+        with pytest.raises(ValueError):
             client.receive_bytes(0)
-        except Exception as e:
-            assert isinstance(e, ValueError)
 
-        try:
+        with pytest.raises(ValueError):
             client.receive(0)
-        except Exception as e:
-            assert isinstance(e, ValueError)
 
-        try:
-            client.iter_receive(0)
-        except Exception as e:
-            assert isinstance(e, ValueError)
+        with pytest.raises(ValueError):
+            for chunk in client.iter_receive(0):
+                print(chunk)
 
     def test_send_before_connect(self, client):
         add_file_handler(logger,
                          os.path.join(log_folder, "test_send_before_connect.log"),
                          logging.DEBUG,
                          "test_send_before_connect-filehandler")
-        try:
+        with pytest.raises(ConnectionError):
             client.send(b"hello")
-        except Exception as e:
-            assert isinstance(e, ConnectionError)
 
     def test_send_bytes_before_connect(self, client):
         add_file_handler(logger,
                          os.path.join(log_folder, "test_send_bytes_before_connect.log"),
                          logging.DEBUG,
                          "test_send_bytes_before_connect-filehandler")
-        try:
+        with pytest.raises(ConnectionError):
             client.send_bytes(b"hello")
-        except Exception as e:
-            assert isinstance(e, ConnectionError)

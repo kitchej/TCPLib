@@ -7,6 +7,7 @@ import logging
 import socket
 import threading
 import queue
+from contextlib import suppress
 from functools import partial
 
 from .message import Message
@@ -26,9 +27,10 @@ class ClientProcessor:
                  msg_q: queue.Queue,
                  buff_size=4096,
                  timeout: int | None = None,
+                 max_timeouts: int = None,
                  on_disconnect: partial | None = None):
         self._client_id = client_id
-        self._tcp_client = TCPClient.from_socket(client_soc)
+        self._tcp_client = TCPClient.from_socket(client_soc, is_component=True)
         self._tcp_client.timeout = timeout
         self._remote_addr = client_soc.getpeername()
         self._msg_q = msg_q
@@ -36,6 +38,9 @@ class ClientProcessor:
         self._is_running = False
         self._thread = None
         self._is_running_lock = threading.Lock()
+        self._max_timeouts = max_timeouts
+        self._total_timeouts = 0
+        self._total_timeouts_lock = threading.Lock()
         self._on_disconnect = on_disconnect
 
     def __repr__(self):
@@ -47,13 +52,20 @@ class ClientProcessor:
         self._set_is_running(True)
         while self.is_running:
             try:
-                data = self._tcp_client.receive(self._buff_size)
+                data = self._tcp_client.receive(self._buff_size, suppress_logs=True)
             except AttributeError: # Socket was closed from another thread
                 logger.debug("Socket was closed during receive loop")
                 self.stop()
                 return
             except TimeoutError:
-                logger.error("Timed out while receiving from %s @ %d", self.remote_addr[0], self.remote_addr[1])
+                logger.warning("Timed out while receiving from %s @ %d", self.remote_addr[0], self.remote_addr[1])
+                with self._total_timeouts_lock:
+                    self._total_timeouts += 1
+                    if self._max_timeouts is not None:
+                        if self._total_timeouts >= self._max_timeouts:
+                            logger.error("Client %s timed out too many times. Disconnecting.", self._client_id)
+                            self.stop()
+                            return
                 continue
             except ConnectionError:
                 # Since this thread runs in the background, it is common to get connection errors during normal operations
@@ -101,10 +113,30 @@ class ClientProcessor:
         """
         Sets how long the client will wait for messages from the server (in seconds). The Timeout argument should be
         a positive integer. Setting to zero will cause network operations to fail if no data is received immediately.
-        Passing 'None' will set the timeout to infinity. Returns True on success, False if not. See
+        Passing 'None' will set the timeout to infinity. Returns 'True' on success, 'False' if not. See
         https://docs.python.org/3/library/socket.html#socket-timeouts for more information about timeouts.
         """
         self._tcp_client.timeout = timeout
+
+    @property
+    def max_timeouts(self) -> int | None:
+        """
+        Returns an integer representing the max amount of times the internal receive loop will time out before
+        disconnecting. A value of 'None' represents infinite timeouts. A zero means that the connection can only
+        time out once before disconnecting.
+        """
+        with self._total_timeouts_lock:
+            return self._max_timeouts
+
+    @max_timeouts.setter
+    def max_timeouts(self, value: int | None):
+        """
+        Sets the max amount of times the internal receive loop will time out before disconnecting.
+        A value of 'None' represents infinite timeouts. A zero means that the connection can only
+        time out once before disconnecting.
+        """
+        with self._total_timeouts_lock:
+            self._max_timeouts = value
 
     @property
     def remote_addr(self) -> tuple[str, int]:
@@ -154,7 +186,7 @@ class ClientProcessor:
             if self._thread:
                 try:
                     self._thread.join(timeout=1) # Wait for _receive_loop to quit on its own...
-                except RuntimeError: # ...unless it already quit
+                except RuntimeError: #...unless it already did
                     pass
             self._tcp_client.disconnect()
             if self._on_disconnect is not None and not suppress_callback:

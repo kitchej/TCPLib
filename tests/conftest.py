@@ -55,7 +55,7 @@ def setup_log_folder(folder_name):
 @pytest.fixture
 def dummy_server():
     time.sleep(0.1)
-    s = dummy_soc.DummyServer(HOST, PORT)
+    s = dummy_soc.DummyServer()
     yield s
     s.stop()
 
@@ -90,7 +90,7 @@ def server():
 
 @pytest.fixture
 def client_processor(dummy_client, dummy_server):
-    dummy_server.start()
+    dummy_server.start((HOST, PORT))
     dummy_client.connect((HOST, PORT))
     time.sleep(0.1)
     p = ClientProcessor(DUMMY_ID, dummy_server.soc, queue.Queue())
@@ -113,11 +113,18 @@ def error_client(request):
     yield c
     c.disconnect()
 
+@pytest.fixture
+def error_reconnect_client(request):
+    soc = dummy_soc.SocRaiseErr(excep=request.param[0], func_to_fail=request.param[1])
+    c = TCPClient.from_socket(soc)
+    c._last_connected_peer = (HOST, PORT)
+    yield c
+    c.disconnect()
 
 @pytest.fixture
 def error_client_processor(request, dummy_server):
     soc = dummy_soc.SocRaiseErr(excep=request.param[0], func_to_fail=request.param[1])
-    dummy_server.start()
+    dummy_server.start((HOST, PORT))
     soc.connect((HOST, PORT))
     time.sleep(0.1)
     p = ClientProcessor(DUMMY_ID, dummy_server.soc, queue.Queue())
