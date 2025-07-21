@@ -5,7 +5,7 @@ param (
 
 ./.venv/scripts/Activate.ps1
 $version = $version = py -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])"
-$filepath = "dist/tcplib-$version-py3-none-any.whl"
+$filepath = "dist\tcplib-$version-py3-none-any.whl"
 
 if ($t) {
     pytest -x -v

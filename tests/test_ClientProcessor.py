@@ -24,14 +24,54 @@ class TestClientProcessor:
         assert processor._is_running is False
 
     @staticmethod
-    def recv_loop_raise_exception(proc, c):
-        proc.start()
-        while not proc.is_running:
-            pass
-        time.sleep(0.1)
-        c.sendall(b"Hello World!")
-        time.sleep(0.1)
+    def recv_loop_raise_exception(proc, caplog, expected_txt, wait_time=2, log_level=logging.DEBUG):
+        """
+        Starts a ClientProcessor and confirms an injected exception is logged during _receive_loop().
 
+        Parameters:
+        proc        -> ClientProcessor instance (e.g., from `error_client_processor` fixture)
+        caplog      -> The pytest `caplog` fixture
+        expected_txt -> Expected string in the log
+        wait_time   -> Max time to wait for log message
+        log_level   -> The log level to capture
+        """
+        with caplog.at_level(log_level):
+            proc.start()
+            timeout = time.time() + wait_time
+            found = False
+
+            while time.time() < timeout:
+                if any(expected_txt in record.msg for record in caplog.records):
+                    found = True
+                    break
+                time.sleep(0.05)
+
+            if not found:
+                raise AssertionError(f"Could not find expected log message: \"{expected_txt}\"")
+
+    @staticmethod
+    def assert_message_logged_recv_loop(proc, expected_txt, caplog, wait_time, log_level=logging.DEBUG):
+        """
+        Asserts that a message was logged in ClientProcessor._receive_loop()
+        Parameters:
+        proc -> ClientProcessor to test
+        expected_text -> Part or all of the expected log message
+        caplog -> the caplog fixture (must be requested in the test)
+        log_level -> Specifies which logging level to look for expected_txt in
+        """
+        with caplog.at_level(log_level):
+            proc.start()
+            while not proc.is_running:
+                continue
+            timeout = time.time() + wait_time
+            found = False
+            while time.time() < timeout:
+                if any(expected_txt in record.msg for record in caplog.records):
+                    found = True
+                    break
+                time.sleep(0.05)
+            if not found:
+                raise AssertionError(f"Could not find \"{expected_txt}\" in logs")
 
     def test_class_state(self, client_processor):
         add_file_handler(logger,
@@ -75,18 +115,17 @@ class TestClientProcessor:
         processor.stop()
         self.assert_default_state(processor)
 
-
     """Test error handling in _receive_loop"""
 
     @pytest.mark.parametrize('error_client_processor', [(AttributeError, "recv")], indirect=True)
-    def test_recv_loop_raise_attribute_error(self, error_client_processor):
+    def test_recv_loop_raise_attribute_error(self, error_client_processor, caplog):
         add_file_handler(logger,
                          os.path.join(log_folder, "test_recv_loop_raise_attribute_error.log"),
                          logging.DEBUG,
                          "test_recv_loop_raise_attribute_error-filehandler")
 
-        time.sleep(0.1)
-        self.assert_default_state(error_client_processor[0])
+        self.recv_loop_raise_exception(error_client_processor[0], caplog,
+                                       "Socket was closed during receive loop")
 
     def test_recv_loop_raise_timeout_error(self, client_processor, caplog):
         add_file_handler(logger,
@@ -96,22 +135,12 @@ class TestClientProcessor:
 
         proc = client_processor[0]
         proc.timeout = 0.5
-        with caplog.at_level(logging.WARNING):
-            proc.start()
-            while not proc.is_running:
-                continue
-            # Wait up to 2 seconds for the expected log record to appear
-            timeout = time.time() + 2
-            found = False
-            expected = f"Timed out while receiving from"
-            while time.time() < timeout:
-                if any(expected in record.msg for record in caplog.records):
-                    found = True
-                    break
-                time.sleep(0.05)
 
-            assert found
-
+        self.assert_message_logged_recv_loop(proc,
+                                             "Timed out while receiving from",
+                                             caplog,
+                                             wait_time=2,
+                                             log_level=logging.WARNING)
 
     def test_recv_loop_zero_max_timeouts(self, client_processor, caplog):
         add_file_handler(logger,
@@ -120,23 +149,59 @@ class TestClientProcessor:
                          "test_recv_loop_raise_timeout_error-filehandler")
 
         proc = client_processor[0]
-        proc.timeout = 0.1
+        proc.timeout = 0.5
         proc.max_timeouts = 0
-        with caplog.at_level(logging.ERROR):
-            proc.start()
-            while not proc.is_running:
-                continue
-            # Wait up to 2 seconds for the expected log record to appear
-            timeout = time.time() + 3
-            found = False
-            expected = f"timed out too many times. Disconnecting."
-            while time.time() < timeout:
-                if any(expected in record.msg for record in caplog.records):
-                    found = True
-                    break
-                time.sleep(0.05)
 
-            assert found
+        self.assert_message_logged_recv_loop(proc,
+                                             "timed out too many times. Disconnecting.",
+                                             caplog,
+                                             wait_time=2,
+                                             log_level=logging.ERROR)
+
+    def test_recv_loop_too_many_timeouts(self, client_processor, caplog):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_recv_loop_raise_timeout_error.log"),
+                         logging.DEBUG,
+                         "test_recv_loop_raise_timeout_error-filehandler")
+
+        proc = client_processor[0]
+        proc.timeout = 0.5
+        proc.max_timeouts = 4
+
+        self.assert_message_logged_recv_loop(proc,
+                                             "timed out too many times. Disconnecting.",
+                                             caplog,
+                                             wait_time=5,
+                                             log_level=logging.ERROR)
+
+        assert proc._total_timeouts == 4
+
+    @pytest.mark.parametrize('error_client_processor', [(TimeoutError, "recv")], indirect=True)
+    def test_recv_loop_timeouts_reset(self, error_client_processor, caplog):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_recv_loop_raise_timeout_error.log"),
+                         logging.DEBUG,
+                         "test_recv_loop_raise_timeout_error-filehandler")
+
+        proc = error_client_processor[0]
+        err_c = error_client_processor[1]
+        proc.timeout = 0.5
+        proc.max_timeouts = 5
+
+        proc.start()
+        while not proc.is_running:
+            pass
+        time.sleep(0.1)
+        self.recv_loop_raise_exception(proc, err_c)
+        time.sleep(0.1)
+        self.recv_loop_raise_exception(proc, err_c)
+        time.sleep(0.1)
+        self.recv_loop_raise_exception(proc, err_c)
+        time.sleep(0.1)
+        self.recv_loop_raise_exception(proc, err_c)
+
+        with proc._total_timeouts_lock:
+            assert proc._total_timeouts == 4
 
     @pytest.mark.parametrize('error_client_processor', [(ConnectionError, "recv")], indirect=True)
     def test_recv_loop_raise_connection_error(self, error_client_processor):
@@ -154,6 +219,7 @@ class TestClientProcessor:
                          logging.DEBUG,
                          "test_recv_loop_raise_gai_error-filehandler")
 
+        error_client_processor[0].start()
         self.recv_loop_raise_exception(error_client_processor[0], error_client_processor[1])
 
     @pytest.mark.parametrize('error_client_processor', [(OSError, "recv")], indirect=True)
@@ -163,6 +229,7 @@ class TestClientProcessor:
                          logging.DEBUG,
                          "test_recv_loop_raise_os_error-filehandler")
 
+        error_client_processor[0].start()
         self.recv_loop_raise_exception(error_client_processor[0], error_client_processor[1])
 
     def test_recv_loop(self, client_processor):
@@ -233,6 +300,3 @@ class TestClientProcessor:
             processor.stop()
 
         assert len([record for record in caplog.records if "has been stopped." in record.msg]) == 1
-
-
-

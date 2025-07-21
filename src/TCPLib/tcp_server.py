@@ -11,8 +11,6 @@ import time
 from functools import partial
 from typing import Generator
 
-
-
 from .client_processor import ClientProcessor
 from .tcp_client import TCPClient
 from .message import Message
@@ -76,8 +74,8 @@ class TCPServer:
         logger.debug("Server is listening for connections")
         self._set_is_running(True)
         while self.is_running:
+            client_soc, client_addr = None, None
             try:
-                client_soc, client_addr = None, None
                 client_soc, client_addr = self._soc.accept()
                 if self.is_full:
                     logger.warning("%s @ %d was denied connection due to server being full",
@@ -90,14 +88,14 @@ class TCPServer:
                     logger.warning("New connection timed out before connection could be accepted")
                 else:
                     logger.warning("%s @ %d timed out while setting up it's client processor",
-                                 client_addr[0], client_addr[1])
+                                   client_addr[0], client_addr[1])
                 continue
             except ConnectionError as e:
                 if client_addr is None:
                     logger.warning("New connection was disconnected before connection could be accepted")
                 else:
                     logger.warning("%s @ %d was disconnected while setting up it's client processor",
-                                 client_addr[0], client_addr[1])
+                                   client_addr[0], client_addr[1])
                 continue
             except AttributeError:  # Socket was closed from another thread
                 self.stop()
@@ -123,7 +121,7 @@ class TCPServer:
         self._update_connected_clients(client_proc.id, client_proc)
 
     def _set_is_running(self, value: bool):
-       with self._is_running_lock:
+        with self._is_running_lock:
             self._is_running = value
 
     def on_connect(self, client: TCPClient, client_id: str):
@@ -167,14 +165,14 @@ class TCPServer:
         self._max_clients = new_max
 
     @property
-    def timeout(self):
+    def timeout(self) -> int | float | None:
         """
         Returns the timeout of the server's socket object used for listening for new connections
         """
         return self._timeout
 
     @timeout.setter
-    def timeout(self, timeout: int):
+    def timeout(self, timeout: int | float | None):
         """
         Sets timeout (in seconds) of the server's socket object used for listening for new connections. The Timeout
         argument should be a positive integer. Passing None will set the timeout to infinity. See

@@ -53,7 +53,7 @@ class ClientProcessor:
         while self.is_running:
             try:
                 data = self._tcp_client.receive(self._buff_size, suppress_logs=True)
-            except AttributeError: # Socket was closed from another thread
+            except AttributeError:  # Socket was closed from another thread
                 logger.debug("Socket was closed during receive loop")
                 self.stop()
                 return
@@ -68,11 +68,12 @@ class ClientProcessor:
                             return
                 continue
             except ConnectionError:
-                # Since this thread runs in the background, it is common to get connection errors during normal operations
-                # since disconnecting can happen outside this thread. For this reason, we only need to log this exception
-                # during debugging
+                # Since this thread runs in the background, it is common to get connection errors during normal
+                # operations since disconnecting can happen outside this thread. For this reason, we only need to log
+                # this exception during debugging
                 if logger.level == logging.DEBUG:
-                    logger.exception("Connection error while receiving from %s @ %d", self.remote_addr[0], self.remote_addr[1])
+                    logger.exception("Connection error while receiving from %s @ %d", self.remote_addr[0],
+                                     self.remote_addr[1])
                 self.stop()
                 return
             except OSError:
@@ -86,12 +87,13 @@ class ClientProcessor:
                 self.stop()
                 return
 
+            with self._total_timeouts_lock:
+                self._total_timeouts = 0
             self._msg_q.put(Message(len(data), data, self._client_id))
 
     def _set_is_running(self, new_value):
         with self._is_running_lock:
             self._is_running = new_value
-
 
     @property
     def id(self) -> str:
@@ -100,16 +102,15 @@ class ClientProcessor:
         """
         return self._client_id
 
-
     @property
-    def timeout(self) -> int | None:
+    def timeout(self) -> int | float | None:
         """
         Returns an int representing the current timeout value.
         """
         return self._tcp_client.timeout
 
     @timeout.setter
-    def timeout(self, timeout: int):
+    def timeout(self, timeout: int | float | None):
         """
         Sets how long the client will wait for messages from the server (in seconds). The Timeout argument should be
         a positive integer. Setting to zero will cause network operations to fail if no data is received immediately.
@@ -158,6 +159,9 @@ class ClientProcessor:
         Send bytes to the client with a 4 byte header attached. Returns True on successful transmission,
         False on failed transmission. Raises TimeoutError, ConnectionError, and OSError.
         """
+        if not self.is_running:
+            logger.warning("Attempted to send on inactive ClientProcessor %s", self._client_id)
+            return
         return self._tcp_client.send(data)
 
     def start(self):
@@ -173,7 +177,7 @@ class ClientProcessor:
                                             name=f"TCPServerClientProc#{self._client_id}")
             self._thread.start()
             logger.info("Processing connection to %s @ %d as client #%s", self.remote_addr[0],
-                    self.remote_addr[1], self._client_id)
+                        self.remote_addr[1], self._client_id)
 
     def stop(self, suppress_callback=False):
         """
@@ -185,8 +189,8 @@ class ClientProcessor:
             self._set_is_running(False)
             if self._thread:
                 try:
-                    self._thread.join(timeout=1) # Wait for _receive_loop to quit on its own...
-                except RuntimeError: #...unless it already did
+                    self._thread.join(timeout=1)  # Wait for _receive_loop to quit on its own...
+                except RuntimeError:  # ...unless it already did
                     pass
             self._tcp_client.disconnect()
             if self._on_disconnect is not None and not suppress_callback:

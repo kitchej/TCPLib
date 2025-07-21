@@ -25,12 +25,11 @@ class TCPClient:
         self._is_connected = False
         self._is_host = False
         self._last_connected_peer = (None, None)
-        # Indicates that TCPClient is a member of another class. This will supress log messages in
+
+        # Indicates that TCPClient is a member of another class, specifically a ClientProcessor. This will supress log
+        # messages in _handle_error(), receive_bytes(), send_bytes(), and disconnect() methods, since ClientProcessor
+        # already has its own logging for these functions
         self._is_component = is_component
-
-
-
-        # that already logs the same errors
 
     def __enter__(self):
         return self
@@ -103,7 +102,7 @@ class TCPClient:
         return self._is_connected
 
     @property
-    def timeout(self) -> int | None:
+    def timeout(self) -> int | float | None:
         """
         Returns the current timeout value of the client. 'None' indicates an infinite timeout.
         See https://docs.python.org/3/library/socket.html#socket-timeouts for more information about timeouts.
@@ -111,7 +110,7 @@ class TCPClient:
         return self._timeout
 
     @timeout.setter
-    def timeout(self, timeout: int | None):
+    def timeout(self, timeout: int | float | None):
         """
         Sets the timeout (in seconds) of the client. The Timeout argument should be a positive integer.
         Passing 'None' will set the timeout to infinity.
@@ -245,8 +244,8 @@ class TCPClient:
         """Disconnect from the currently connected host. If no connection is opened, this method does nothing."""
         if self._is_connected:
             self._clean_up()
-            if self._is_component
-            logger.info("Disconnected from %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
+            if self._is_component:
+                logger.info("Disconnected from %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
 
     def send_bytes(self, data: bytes) -> bool:
         """Send raw bytes with no size header. Raises TimeoutError, ConnectionError, and OSError."""
@@ -273,7 +272,7 @@ class TCPClient:
             raise ConnectionError("Client is not connected to a host")
         return self.send_bytes(encode_msg(data))
 
-    def receive_bytes(self, size: int, suppress_logs=False) -> bytes:
+    def receive_bytes(self, size: int) -> bytes:
         """
         Receive only the number of bytes specified. Returns an empty bytes-like object on failure or closed connection.
         Raises TimeoutError, ConnectionError, and OSError.
@@ -289,7 +288,7 @@ class TCPClient:
             self._clean_up()
             return bytes(0)
         except TimeoutError as e:
-            if not suppress_logs:
+            if not self._is_component:
                 logger.warning(e, "Timed out while receiving from %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
             raise e
         except ConnectionError as e:

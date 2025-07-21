@@ -127,11 +127,9 @@ def error_client_processor(request, dummy_server):
     dummy_server.start((HOST, PORT))
     soc.connect((HOST, PORT))
     time.sleep(0.1)
-    p = ClientProcessor(DUMMY_ID, dummy_server.soc, queue.Queue())
-    yield p, soc
+    p = ClientProcessor(DUMMY_ID, soc, queue.Queue())
+    yield p, dummy_server.soc
     p.stop()
-    soc.close()
-    dummy_server.stop()
 
 
 @pytest.fixture
