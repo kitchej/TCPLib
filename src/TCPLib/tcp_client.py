@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 class TCPClient:
     """
-    A simple TCP client that can connect to a TCP/IP host
+    A simple client that can connect to a TCP/IP host
     """
 
     def __init__(self, timeout: int = None, is_component=False):
@@ -92,7 +92,7 @@ class TCPClient:
 
     def _handle_error(self, exception: Exception, log_msg: str, *log_args):
         if not self._is_component:
-            logger.exception(log_msg, *log_args)
+            logger.error(log_msg, *log_args)
         self._clean_up()
         raise exception
 
@@ -187,7 +187,7 @@ class TCPClient:
 
     def connect(self, addr: tuple[str, int]):
         """
-        Initiates a connection to a TCP/IP host. Raises TimeoutError, ConnectionError, and socket.gaierror.
+        Initiates a connection to a TCP/IP host. Raises TimeoutError, ConnectionError, OSError, and socket.gaierror.
         """
         if self._is_connected:
             return
@@ -244,8 +244,8 @@ class TCPClient:
         """Disconnect from the currently connected host. If no connection is opened, this method does nothing."""
         if self._is_connected:
             self._clean_up()
-            if self._is_component:
-                logger.info("Disconnected from %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
+            if not self._is_component:
+                logger.info("Disconnected from %s @ %d",                                                                                                                     self._last_connected_peer[0], self._last_connected_peer[1])
 
     def send_bytes(self, data: bytes) -> bool:
         """Send raw bytes with no size header. Raises TimeoutError, ConnectionError, and OSError."""
@@ -259,7 +259,7 @@ class TCPClient:
             return False
         except TimeoutError as e:
             if not self._is_component:
-                logger.warning(e, "Timed out while sending from %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
+                logger.warning("Timed out while sending from %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
             raise e
         except ConnectionError as e:
             self._handle_error(e, "Connection error while sending to %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
@@ -289,7 +289,7 @@ class TCPClient:
             return bytes(0)
         except TimeoutError as e:
             if not self._is_component:
-                logger.warning(e, "Timed out while receiving from %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
+                logger.warning("Timed out while receiving from %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
             raise e
         except ConnectionError as e:
             self._handle_error(e, "Connection error while receiving from %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])

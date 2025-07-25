@@ -1,16 +1,13 @@
+import logging
 import threading
 import time
 import socket
 from TCPLib.tcp_server import TCPServer
 
+logger = logging.getLogger(__name__)
 
-class OnConnectServer(TCPServer):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def on_connect(self, client, client_id):
-        return False
-
+def on_connect(*args):
+    return False
 
 class DummyServer:
     def __init__(self):
@@ -39,8 +36,10 @@ class DummyServer:
     def stop(self):
         if self.listen_soc:
             self.listen_soc.close()
+            logger.debug("Dummy server has been closed it's listening socket")
         if self.soc:
             self.soc.close()
+            logger.debug("Dummy server has been closed it's client socket")
 
         self.soc = None
         self.listen_soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -88,6 +87,7 @@ class SocRaiseErr(socket.socket):
     def accept(self):
         if self.func_to_fail == 'accept':
             if self.excep:
+                time.sleep(0.1)
                 raise self.excep
         return super().accept()
 

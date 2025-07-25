@@ -354,7 +354,7 @@ class TestTCPClient:
         dummy_server.start((HOST, PORT))
 
         self.assert_excep_raised_on_send(error_client, error_client._soc.excep)
-        self.assert_default_state(error_client)
+        assert error_client.is_connected
 
     @pytest.mark.parametrize('error_client', [(ConnectionError, "sendall")], indirect=True)
     def test_send_connection_error(self, error_client, dummy_server):
@@ -390,7 +390,7 @@ class TestTCPClient:
         dummy_server.start((HOST, PORT))
 
         self.assert_excep_raised_on_recv(error_client, error_client._soc.excep)
-        self.assert_default_state(error_client)
+        assert error_client.is_connected
 
     @pytest.mark.parametrize('error_client', [(ConnectionError, "recv")], indirect=True)
     def test_recv_connection_error(self, error_client, dummy_server):

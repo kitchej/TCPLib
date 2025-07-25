@@ -26,70 +26,105 @@ class TestTCPServer:
         assert server._is_running is False
         assert len(server._connected_clients) == 0
 
+
+    @staticmethod
+    def assert_msg_logged_mainloop(s, caplog, expected_txt, wait_time=2):
+        found=False
+        delay = time.time() + wait_time
+        with caplog.at_level(logging.DEBUG):
+            s.start((HOST, PORT))
+            while not s.is_running:
+                pass
+
+            while time.time() < delay:
+                if any(expected_txt in record.msg for record in caplog.records):
+                    found = True
+                    break
+                time.sleep(0.05)
+            if not found:
+                raise AssertionError(f"Could not find \"{expected_txt}\" in logs")
+
+
     @pytest.mark.parametrize('client_list', [11], indirect=True)
-    def test_class_state(self, server, client_list):
+    def test_class_state(self, server_no_start, client_list):
         add_file_handler(logger,
                          os.path.join(log_folder, "test_class_state.log"),
                          logging.DEBUG,
                          "test_class_state-filehandler")
-        self.assert_default_state(server)
-        server.start((HOST, PORT))
 
-        while not server.is_running:
+        self.assert_default_state(server_no_start)
+        server_no_start.start((HOST, PORT))
+        while not server_no_start.is_running:
             pass
+        assert server_no_start._addr == (HOST, PORT)
+        assert server_no_start._max_clients == 0
+        assert server_no_start._timeout is None
+        assert isinstance(server_no_start._messages, queue.Queue)
+        assert server_no_start._soc is not None
+        assert server_no_start._is_running is True
+        assert len(server_no_start._connected_clients) == 0
 
-        time.sleep(0.1)
-
-        assert server._addr == (HOST, PORT)
-        assert server._max_clients == 0
-        assert server._timeout is None
-        assert isinstance(server._messages, queue.Queue)
-        assert server._soc is not None
-        assert server._is_running is True
-        assert len(server._connected_clients) == 0
-
-        assert server.addr == (HOST, PORT)
-        assert server.is_running is True
-        server.max_clients = 10
-        assert server.max_clients == 10
-        server.timeout = 10
-        assert server.timeout == 10
-        server.timeout = None
+        assert server_no_start.addr == (HOST, PORT)
+        assert server_no_start.is_running is True
+        server_no_start.max_clients = 10
+        assert server_no_start.max_clients == 10
+        server_no_start.timeout = 10
+        assert server_no_start.timeout == 10
+        server_no_start.timeout = None
 
         for i in range(10):
             time.sleep(0.1)
             client_list[i].connect((HOST, PORT))
 
         time.sleep(0.1)
-        assert server.is_full is True
-        assert server.client_count == 10
+        assert server_no_start.is_full is True
+        assert server_no_start.client_count == 10
 
         client_list[10].connect((HOST, PORT))
         time.sleep(0.1)
 
-        assert server.is_full is True
-        assert server.client_count == 10
+        assert server_no_start.is_full is True
+        assert server_no_start.client_count == 10
 
-        server.set_clients_timeout(1)
-        time.sleep(0.1)
-
-        client_ids = server.list_clients()
+        client_ids = server_no_start.list_clients()
         assert len(client_ids) == 10
 
-        for client_id, client in zip(client_ids, client_list[:11]):
-            info = server.get_client_info(client_id)
-            assert info["is_running"] is True
-            assert info["timeout"] == 1
-            assert info["addr"] == client._soc.getsockname()
+        server_no_start.disconnect_client(client_ids[0])
+        assert server_no_start.is_full is False
+        assert server_no_start.client_count == 9
 
-        server.disconnect_client(client_ids[0])
-        assert server.is_full is False
-        assert server.client_count == 9
-
-        server.stop()
+        server_no_start.stop()
         time.sleep(0.1)
-        server.max_clients = 0
-        self.assert_default_state(server)
+        server_no_start.max_clients = 0
+        self.assert_default_state(server_no_start)
+
+    @pytest.mark.parametrize('client_list', [10], indirect=True)
+    def test_get_set_client_attributes(self, server, client_list):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_get_set_client_attributes.log"),
+                         logging.DEBUG,
+                         "test_get_set_client_attributes-filehandler")
+
+        for client in client_list:
+            client.connect((HOST, PORT))
+            time.sleep(0.1)
+
+        for client_id, client in zip(server.list_clients(), client_list[:11]):
+            server.set_client_attribute(client_id, 'timeout', 30)
+            server.set_client_attribute(client_id, 'max_timeouts', 29)
+            with pytest.raises(ValueError):
+                server.set_client_attribute(client_id, 'is_running', 30)
+                server.set_client_attribute(client_id, 'addr', 30)
+                server.set_client_attribute(client_id, 'total_timeouts', 30)
+
+
+        for client_id, client in zip(server.list_clients(), client_list[:11]):
+            info = server.get_client_attributes(client_id)
+            assert info["is_running"] is True
+            assert info["timeout"] == 30
+            assert info["addr"][0] == HOST
+            assert info["total_timeouts"] == 0
+            assert info["max_timeouts"] == 29
 
     def test_from_socket(self, client):
         add_file_handler(logger,
@@ -115,46 +150,36 @@ class TestTCPServer:
     """Test exception handling in _mainloop()"""
 
     @pytest.mark.parametrize('error_server', [(ConnectionError, "accept")], indirect=True)
-    def test_mainloop_connection_error(self, error_server, dummy_client):
+    def test_mainloop_connection_error(self, error_server, caplog):
         add_file_handler(logger,
                          os.path.join(log_folder, "test_mainloop_connection_error.log"),
                          logging.DEBUG,
                          "test_mainloop_connection_error-filehandler")
 
-        error_server.start((HOST, PORT))
-        time.sleep(0.1)
-        dummy_client.connect((HOST, PORT))
-        time.sleep(0.1)
-
+        self.assert_msg_logged_mainloop(error_server, caplog, "New connection was disconnected before connection could be accepted")
         assert error_server._is_running
-        assert error_server.client_count == 0
 
     @pytest.mark.parametrize('error_server', [(TimeoutError, "accept")], indirect=True)
-    def test_mainloop_timeout_error(self, error_server, dummy_client):
+    def test_mainloop_timeout_error(self, error_server, caplog):
         add_file_handler(logger,
                          os.path.join(log_folder, "test_mainloop_timeout_error.log"),
                          logging.DEBUG,
                          "test_mainloop_timeout_error-filehandler")
 
-        error_server.start((HOST, PORT))
-        time.sleep(0.1)
-        dummy_client.connect((HOST, PORT))
-        time.sleep(0.1)
+        self.assert_msg_logged_mainloop(error_server, caplog, "New connection timed out before connection could be accepted")
+
 
         assert error_server._is_running
-        assert error_server.client_count == 0
 
     @pytest.mark.parametrize('error_server', [(AttributeError, "accept")], indirect=True)
-    def test_mainloop_attribute_error(self, error_server, dummy_client):
+    def test_mainloop_attribute_error(self, error_server, caplog):
         add_file_handler(logger,
                          os.path.join(log_folder, "test_mainloop_attribute_error.log"),
                          logging.DEBUG,
                          "test_mainloop_attribute_error-filehandler")
 
-        error_server.start((HOST, PORT))
-        time.sleep(0.1)
-        assert not error_server.is_running
-        assert error_server.client_count == 0
+        self.assert_msg_logged_mainloop(error_server, caplog, "Server has been stopped")
+        self.assert_default_state(error_server)
 
     @pytest.mark.parametrize('error_server', [(OSError, "accept")], indirect=True)
     def test_mainloop_os_error(self, error_server, dummy_client):
@@ -163,9 +188,6 @@ class TestTCPServer:
                          logging.DEBUG,
                          "test_mainloop_os_error-filehandler")
 
-        error_server.start((HOST, PORT))
-        time.sleep(0.1)
-        assert not error_server.is_running
         assert error_server.client_count == 0
 
     """Test message queue"""
@@ -176,9 +198,6 @@ class TestTCPServer:
                          os.path.join(log_folder, "test_pop_msg.log"),
                          logging.DEBUG,
                          "test_pop_msg-filehandler")
-
-        server.start((HOST, PORT))
-        time.sleep(0.1)
 
         for client in client_list:
             client.connect((HOST, PORT))
@@ -237,20 +256,21 @@ class TestTCPServer:
         time.sleep(0.1)
         assert not on_connect_server.has_messages()
 
-    def test_invalid_address(self, server):
+    def test_invalid_address(self, server_no_start):
         add_file_handler(logger,
                          os.path.join(log_folder, "test_invalid_address.log"),
                          logging.DEBUG,
                          "test_invalid_address-filehandler")
 
-        with pytest.raises(ValueError):
-            server.start(("999.999.999.999", PORT))
 
         with pytest.raises(ValueError):
-            server.start(("255.255.255.255", PORT))
+            server_no_start.start(("999.999.999.999", PORT))
 
         with pytest.raises(ValueError):
-            server.start((HOST, 70000))
+            server_no_start.start(("255.255.255.255", PORT))
+
+        with pytest.raises(ValueError):
+            server_no_start.start((HOST, 70000))
 
     def test_start_stop_multiple_calls(self, server, client, caplog):
         add_file_handler(logger,

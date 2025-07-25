@@ -47,16 +47,13 @@ class ClientProcessor:
         return f"<ClientProcessor remote_addr={self._remote_addr} running={self.is_running} client_id={self._client_id}>"
 
     def _receive_loop(self):
+        """Listens for incoming messages from the client connection being managed. Runs on a background thread."""
         logger.debug("Client %s has started _receive_loop() and is listening for new messages from %s @ %d",
                      self._client_id, self.remote_addr[0], self.remote_addr[1])
         self._set_is_running(True)
         while self.is_running:
             try:
                 data = self._tcp_client.receive(self._buff_size, suppress_logs=True)
-            except AttributeError:  # Socket was closed from another thread
-                logger.debug("Socket was closed during receive loop")
-                self.stop()
-                return
             except TimeoutError:
                 logger.warning("Timed out while receiving from %s @ %d", self.remote_addr[0], self.remote_addr[1])
                 with self._total_timeouts_lock:
@@ -68,11 +65,11 @@ class ClientProcessor:
                             return
                 continue
             except ConnectionError:
-                # Since this thread runs in the background, it is common to get connection errors during normal
-                # operations since disconnecting can happen outside this thread. For this reason, we only need to log
+                # Since this thread runs in the background, it's common to get connection errors during normal
+                # operation since disconnecting can happen outside this thread. For this reason, we only need to log
                 # this exception during debugging
-                if logger.level == logging.DEBUG:
-                    logger.exception("Connection error while receiving from %s @ %d", self.remote_addr[0],
+                if logger.getEffectiveLevel() == logging.DEBUG:
+                    logger.error("Connection error while receiving from %s @ %d", self.remote_addr[0],
                                      self.remote_addr[1])
                 self.stop()
                 return
@@ -92,6 +89,7 @@ class ClientProcessor:
             self._msg_q.put(Message(len(data), data, self._client_id))
 
     def _set_is_running(self, new_value):
+        """A thread-safe way of setting the _is_running state of the class"""
         with self._is_running_lock:
             self._is_running = new_value
 
@@ -120,9 +118,17 @@ class ClientProcessor:
         self._tcp_client.timeout = timeout
 
     @property
+    def total_timeouts(self) -> int | None:
+        """
+        Returns an integer representing the number of times the client connection has timed out.
+        """
+        with self._total_timeouts_lock:
+            return self._total_timeouts
+
+    @property
     def max_timeouts(self) -> int | None:
         """
-        Returns an integer representing the max amount of times the internal receive loop will time out before
+        Returns an integer representing the max amount of times the client connection will time out before
         disconnecting. A value of 'None' represents infinite timeouts. A zero means that the connection can only
         time out once before disconnecting.
         """

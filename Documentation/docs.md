@@ -1,212 +1,216 @@
+# TCPLib Public API Documentation
 
+## Table of Contents
+- [Message](#message)
+- [TCPServer](#tcpserver)
+  - [Properties](#tcpserver-properties)
+  - [Methods](#tcpserver-methods)
+- [TCPClient](#tcpclient)
+  - [Properties](#tcpclient-properties)
+  - [Methods](#tcpclient-methods)
+- [ClientProcessor](#clientprocessor)
+  - [Properties](#clientprocessor-properties)
+  - [Methods](#clientprocessor-methods)
 
-- [TCPLib Documentation](#tcplib-documentation)
-  - [**Message(self, size, data, client\_id=None)**](#messageself-size-data-client_idnone)
-    - [**Properties**](#properties)
-  - [**TCPServer(self, max\_clients: int = 0, timeout: int = None)**](#tcpserverself-max_clients-int--0-timeout-int--none)
-    - [**Properties**](#properties-1)
-    - [**Methods**](#methods)
-  - [**TCPClient(self, timeout: int = None)**](#tcpclientself-timeout-int--none)
-    - [**Properties**](#properties-2)
-    - [**Methods**](#methods-1)
 
 ---
-# TCPLib Documentation
 
+## Message
 
-## **Message(self, size, data, client_id=None)**
+### `Message(self, size, data, client_id=None)`
 
-### **Properties**
-* **size:** 
-Size of the message in bytes
+Represents a message sent over the network.
 
-* **data:**
-Raw bytes of the message
+#### Properties
+- **size:**  
+  The size of the message in bytes.
 
-* **client_id:** 
-Id of the client who sent the message
+- **data:**  
+  Raw bytes of the message.
 
----
-## **TCPServer(self, max_clients: int = 0, timeout: int = None)**
-
-A TCP Server that can listen for and manage multiple TCP/IP client connections. If max_clients is 0, then the server capacity will
-be infinite. If timeout is None, the timeout will be infinite.
-
-### **Properties**
-
-* **addr:** 
-
-  A tuple with the current address the server is listening on. Read only.
-
-
-* **is_running:** 
-
-  A boolean indicating whether the server is set up and running. Read only.
-
-
-* **max_clients:** 
-
-  An positive integer representing the maximum allowed connections. Zero indicates that the server will allow infinite
-  connections.
-
-
-* **timeout:** 
-
-  A positive integer representing the amount of time the server will wait on a connection. A value of None indicates an infinite timeout.
-
-
-* **client_count:**
-
-  An int representing the number of connected clients. Read only.
-
-
-* **is_full:** 
-
-  A boolean indicating if the server is full. Read only.
-
-
-* **client_count:** 
-
-  An int representing the number of connected clients. Read only.
-
-### **Methods**
-
-* **from_socket(soc: socket.socket, max_clients: int)**
- 
-    A class method that allows for a TCPServer object to be created from a socket object. The socket must be initialized and bound to an address.
-    Returns a new TCPServer object.
-
-
-* **set_clients_timeout(timeout: ```int```):** 
-
-    Sets the timeout (in seconds) of the all current client sockets. The Timeout argument should be a positive integer. Passing None will set the timeout to infinity. Returns True on success, False if not. ee https://docs.python.org/3/library/socket.html#socket-timeouts for more information about timeouts.
-
-
-* **list_clients():** 
-
-    Returns a list with the client ids of all connected clients.
-
-
-* **get_client_info(client_id: ```str```)** 
-
-    Gives basic info about a client given a client_id. Returns a dictionary with keys 'is_running', 'timeout', 'addr'. Returns None if a client with client_id cannot be found.
-
-
-* **disconnect_client(client_id: ```str```)** 
-
-    Disconnects a client with client_id. Returns False if no client with client_id was connected, True on a successful disconnect.
-
-
-* **pop_msg(self, block: ```bool``` = False, timeout: ```int``` = None)**
-
-    Get the next message in the queue. If block is True, this method will block until it can pop a message from the queue, otherwise it will try to get a value and return None if queue is empty. If block is True and a timeout is given, block until timeout expires and then return None if no item was received.
-    See  https://docs.python.org/3/library/queue.html#queue.Queue.get for more information.
-
-
-* **get_all_msg(self, block: ```bool``` = False, timeout: ```int``` = None)**
-
-    Generator for iterating over the message queue. If block is True, each iteration of this method will block until it
-    can pop something from the queue, else it will try to get a value and yield None if queue is empty. If block
-    is True and a timeout is given, block until timeout expires and then yield None if no item was received.
-    See  https://docs.python.org/3/library/queue.html#queue.Queue.get for more information.
-
-
-* **has_messages()**
-
-    Returns a boolean indicating if the message queue has any messages.
-
-
-* **send(client_id: ```str```, data: ```bytes```)**
-
-    Sends data to a connected client. Returns True on successful sending, False if not or if a client with
-    client_id could not be found.
-
-
-* **start(addr: ```tuple[str, int]```)**
-
-    Starts the server and listens for connections on the address provided.
-
-
-* **stop(addr: ```tuple[str, int]```)**
-
-    Stops the server. If the server is not running, this method will do nothing.
+- **client_id:**  
+  The ID of the client that sent the message.
 
 ---
-## **TCPClient(self, timeout: int = None)**
 
-A simple TCP client that can connect to a TCP/IP host
+## TCPServer
 
+### `TCPServer(self, max_clients: int = 0, timeout: int = None)`
 
-### **Properties**
+A TCP server that listens for and manages multiple TCP/IP client connections.
 
+If `max_clients` is 0, the server allows an unlimited number of connections.  
+If `timeout` is None, the server socket has no timeout.
 
-* **is_connected:** 
-A boolean indicating if the client is connected. Read only.
+### TCPServer Properties
+- **addr:**  
+  A tuple representing the address the server is currently bound to. Read-only.
 
+- **is_running:**  
+  Indicates whether the server is actively listening for connections. Read-only.
 
-* **timeout:** 
-A positive integer representing the amount of time the client will wait on a connection. A value of None indicates an infinite timeout.
+- **max_clients:**  
+  A positive integer indicating the maximum allowed client connections.  
+  A value of 0 means unlimited.
 
-  
-* **host_addr:** 
-Returns a tuple with the host connection's address. Read only.
+- **timeout:**  
+  Timeout (in seconds) for accepting new connections. A value of `None` disables timeouts.
 
+- **client_count:**  
+  The number of currently connected clients. Read-only.
 
-* **remote_addr:** 
-Returns a tuple with the remote connection's address. Read only.
+- **is_full:**  
+  Boolean indicating whether the server has reached `max_clients`. Read-only.
 
-
-* **is_host:** 
-Returns a boolean indicating if this client is the host. Read only.
-
-
-### **Methods**
-
-* **from_socket(soc: socket.socket)**
-
-    A class method that allows for a TCPClient object to be created from a socket object. The socket must be initialized and connected. Returns
-    a new TCPClient object.
-
-
-* **host_single_client(addr: ```tuple[str, int]```, timeout: ```int``` = None)**
-
-    Hosts a single connection from a remote TCP/IP connection. The timeout argument sets how long this
-    method will listen for a connection. Raises TimeoutError, ConnectionError, and socket.gaierror.
+### TCPServer Methods
+- **from_socket(soc: socket.socket, max_clients: int):**  
+  Class method that creates a `TCPServer` from an existing bound socket.  
+  Returns a new `TCPServer` instance. Example:
 
 
-* **connect(addr: ```tuple[str, int]```)**
+     server = TCPServer.from_socket(soc, max_clients=25)
 
-    Initiates a connection to a TCP/IP host. Raises TimeoutError, ConnectionError, and socket.gaierror.
+- **set_clients_timeout(timeout: int):**  
+  Sets the timeout (in seconds) for all currently connected clients.  
+  Returns `True` on success, `False` otherwise.
 
+- **list_clients():**  
+  Returns a list of client IDs for all currently connected clients.
 
-* **disconnect()**
+- **get_client_info(client_id: str):**  
+  Returns a dictionary with keys `is_running`, `timeout`, and `addr` for the specified client.  
+  Returns `None` if the client cannot be found.
 
-    Disconnect from the currently connected host. If no connection is opened, this method does nothing.
+- **get_client_attributes(client_id: str):**  
+  Returns a dictionary with keys `is_running`, `timeout`, `addr`, `total_timeouts`, and `max_timeouts`.  
+  Raises `KeyError` if the client cannot be found.
 
+- **set_client_attribute(client_id: str, attribute: str, value):**  
+  Sets a specific attribute (`timeout` or `max_timeouts`) for a given client.  
+  Raises `KeyError` or `ValueError` if the attribute is invalid or the client doesn't exist.
 
-* **send_bytes(data: ```bytes```)**
+- **disconnect_client(client_id: str):**  
+  Disconnects a client by ID.  
+  Disconnects a client with client_id.  Raises `KeyError` if the client is not found.
 
-    Send raw bytes with no size header. Raises TimeoutError, ConnectionError, and OSError.
+- **pop_msg(block: bool = False, timeout: int = None):**  
+  Pops the next message from the queue. If `block=True`, will wait until a message is available.  
+  If a `timeout` is provided, the wait is bounded.
 
+- **get_all_msg(block: bool = False, timeout: int = None):**  
+  Yields all messages currently in the queue. Supports blocking behavior and optional timeout.
 
-* **send(data: ```bytes```)**
+- **has_messages():**  
+  Returns `True` if the message queue is not empty.
 
-  Send raw bytes with a 4 byte size header attached. Raises TimeoutError, ConnectionError, and OSError.
+- **send(client_id: str, data: bytes):**  
+  Sends data to a specific client.  
+  Returns `True` on success, `False` on failure or if client is not found.
 
+- **start(addr: tuple[str, int]):**  
+  Starts the server and begins listening on the specified address.
 
-* **receive_bytes(size: int)**
+- **stop():**  
+  Stops the server and disconnects all clients.
 
-  Receive only the number of bytes specified. Returns None if connection was closed prematurely. Raises TimeoutError,
-  ConnectionError, and OSError.
+---
 
+## TCPClient
 
-* **iter_receive(buff_size: ```int``` = 4096)**
+### `TCPClient(self, timeout: int = None)`
 
-    Returns a generator for iterating over the bytes of an incoming message. An integer representing the message
-    size is yielded first. Subsequent calls yield the contents of the message as it is received. Raises
-    TimeoutError, ConnectionError, and OSError.
+A TCP client that can connect to or host a TCP/IP connection.
 
+### TCPClient Properties
+- **is_connected:**  
+  Indicates whether the client is currently connected. Read-only.
 
-* **receive()**
+- **timeout:**  
+  Timeout (in seconds) for socket operations. A value of `None` disables timeouts.
 
-    Receive raw bytes. Expects a 4 bytes size header to be attached. Returns a bytearray. Raises TimeoutError, ConnectionError, and OSError.
+- **local_addr:**  
+  Local address bound to the client socket. Returns `None` if disconnected.
+
+- **peer_addr:**  
+  Address of the remote host. Returns `None` if disconnected.
+
+- **is_host:**  
+  `True` if the client is acting as a server (host), otherwise `False`.
+
+### TCPClient Methods
+- **from_socket(soc: socket.socket, is_listen_soc=False):**  
+  Creates a TCPClient instance from a raw socket.  
+  `is_listen_soc=True` marks it as a listening host socket.
+
+- **host_single_client(addr: tuple[str, int], timeout: int = None):**  
+  Hosts a connection from a remote client.  
+  Waits for one connection, raising on timeout or connection failure.
+
+- **connect(addr: tuple[str, int]):**  
+  Connects to a remote TCP/IP server.  
+  Raises `TimeoutError`, `ConnectionError`, `OSError`, or `socket.gaierror`.
+
+- **reconnect():**  
+  Attempts to reconnect to the last successfully connected peer.  
+  Raises if no prior connection exists.
+
+- **disconnect():**  
+  Gracefully disconnects from the remote host.
+
+- **send_bytes(data: bytes):**  
+  Sends raw bytes with no header.  
+  Raises on timeout or connection failure.
+
+- **send(data: bytes):**  
+  Sends bytes with a 4-byte size header.
+
+- **receive_bytes(size: int):**  
+  Receives exactly `size` bytes.  
+  Returns empty bytes on socket closure.  
+  Raises `TimeoutError`, `ConnectionError`, or `OSError`.
+
+- **iter_receive(buff_size: int = 4096):**  
+  Generator that yields chunks of a message. First yield is the total message size.
+
+- **receive(buff_size: int = 4096):**  
+  Receives a full message as a `bytearray`.  
+  Returns empty `bytearray` on failure or closed connection.
+
+---
+
+## ClientProcessor
+
+### `ClientProcessor(client_id, client_soc, msg_q, ...)`
+
+Maintains a dedicated connection to a single client. Runs a background thread to receive messages and places them in a shared queue.
+
+### ClientProcessor Properties
+- **id:**  
+  The ID string identifying this client processor.
+
+- **timeout:**  
+  Timeout value used for receiving data. Can be modified at runtime.
+
+- **total_timeouts:**  
+  The number of times this client has timed out while waiting for messages.
+
+- **max_timeouts:**  
+  The max allowed timeouts before the client is forcibly disconnected.
+
+- **remote_addr:**  
+  A `(host, port)` tuple identifying the remote client.
+
+- **is_running:**  
+  Indicates whether the client processor thread is running.
+
+### ClientProcessor Methods
+- **start():**  
+  Begins the client processor's background thread. Does nothing if already running.
+
+- **stop(suppress_callback=False):**  
+  Stops the background thread and disconnects the client.  
+  If `suppress_callback=True`, the `on_disconnect` hook will not be invoked.
+
+- **send(data: bytes):**  
+  Sends a message to the connected client with a 4-byte header.  
+  Returns `True` on success, `False` if the processor is not active.

@@ -9,7 +9,7 @@ import queue
 import random
 import time
 from functools import partial
-from typing import Generator
+from typing import Generator, Callable
 
 from .client_processor import ClientProcessor
 from .tcp_client import TCPClient
@@ -22,9 +22,22 @@ logger = logging.getLogger(__name__)
 class TCPServer:
     """
     Creates, maintains, and transmits data to multiple TCP/IP connections.
+
+    Parameters:
+    - max_clients:
+        A positive integer representing the max number of allowed connections to this server
+    - timeout
+        A positive float or integer representing the timeout of the socket this address will use to accept new connections.
+        Passing 'None' (default) will enable an infinite timeout
+    - on_connect:
+        A callback that will run for every new connection. Return 'False' to disconnect the client.
+        The signature of the functon is expected to be: def on_connect(client: TCPClient, client_id: str)
     """
 
-    def __init__(self, max_clients: int = 0, timeout: int = None):
+    def __init__(self,
+                 max_clients: int = 0,
+                 timeout: int | float | None = None,
+                 on_connect: Callable[[TCPClient, str], bool] | None = None):
         self._addr = None
         self._max_clients = max_clients
         self._timeout = timeout
@@ -34,6 +47,7 @@ class TCPServer:
         self._is_running_lock = threading.Lock()
         self._connected_clients = {}
         self._connected_clients_lock = threading.Lock()
+        self._on_connect = on_connect
 
     def __repr__(self):
         return (f"<TCPServer addr={self._addr} "
@@ -58,19 +72,8 @@ class TCPServer:
         random_part = f"{random.randint(0, 999):03d}"
         return timestamp_part + random_part
 
-    def _get_client(self, client_id: str) -> ClientProcessor | None:
-        with self._connected_clients_lock:
-            try:
-                client = self._connected_clients[client_id]
-            except KeyError:
-                return
-            return client
-
-    def _update_connected_clients(self, client_id: str, client: ClientProcessor):
-        with self._connected_clients_lock:
-            self._connected_clients.update({client_id: client})
-
     def _mainloop(self):
+        """Mainloop of the server. Listens for connections and attaches it to a ClientProcessor"""
         logger.debug("Server is listening for connections")
         self._set_is_running(True)
         while self.is_running:
@@ -108,10 +111,16 @@ class TCPServer:
         logger.debug("Server is no longer listening for messages")
 
     def _start_client_proc(self, client_id: str, client_soc: socket.socket):
+        """
+        Contains setup necessary to start a ClientProcessor class with a new client connection and register it to
+        self._connected_clients. Also calls the overridable callback on_connect()
+        """
         client = TCPClient.from_socket(client_soc)
-        if not self.on_connect(client, client_id):
-            client.disconnect()
-            return
+        if self._on_connect is not None:
+            if self._on_connect(client, client_id) is False:
+                client.disconnect()
+                return
+
         client_proc = ClientProcessor(client_id=client_id,
                                       client_soc=client_soc,
                                       msg_q=self._messages,
@@ -120,16 +129,24 @@ class TCPServer:
         client_proc.start()
         self._update_connected_clients(client_proc.id, client_proc)
 
+    def _get_client(self, client_id: str) -> ClientProcessor:
+        """Thread-safe way to get a connected client from self._connected_clients. Raises KeyError."""
+        with self._connected_clients_lock:
+            try:
+                client = self._connected_clients[client_id]
+            except KeyError: # Re-raise with more specific error message
+                raise KeyError(f"Could not find a connected client with id #{client_id}")
+            return client
+
+    def _update_connected_clients(self, client_id: str, client: ClientProcessor):
+        """Thread-safe way to add a connected client to self._connected_clients."""
+        with self._connected_clients_lock:
+            self._connected_clients.update({client_id: client})
+
     def _set_is_running(self, value: bool):
+        """A thread-safe way of setting the _is_running state of the class"""
         with self._is_running_lock:
             self._is_running = value
-
-    def on_connect(self, client: TCPClient, client_id: str):
-        """
-        Override to control what actions the server will take when a new client connects.
-        Returning False will disconnect the client.
-        """
-        return True
 
     @property
     def addr(self) -> tuple[str, int]:
@@ -203,17 +220,39 @@ class TCPServer:
                 return True
         return False
 
-    def set_clients_timeout(self, timeout: int):
+    def set_client_attribute(self, client_id: str, attribute: str, value: any):
         """
-        Sets the timeout (in seconds) of the all current client sockets. The Timeout argument should be a positive
-        integer. Passing None will set the timeout to infinity. Returns True on success, False if not.
-        See https://docs.python.org/3/library/socket.html#socket-timeouts for more information about timeouts.
+        Sets a specific attribute of a client connection. Raises KeyError if the client could not be found
+        Valid attributes are:
+            - 'timeout'
+            - 'max_timeouts'
+
+        Raises KeyError if client with client_id could not be found.
         """
-        if timeout < 0:
-            raise ValueError("Timeout cannot be less than zero")
-        for client_id in self.list_clients():
-            client_proc = self._get_client(client_id)
-            client_proc.timeout = timeout
+        client_proc = self._get_client(client_id)
+        if attribute == "timeout":
+            client_proc.timeout = value
+        elif attribute == 'max_timeouts':
+            client_proc.max_timeouts = value
+        elif attribute in ['is_running', 'addr', 'total_timeouts']:
+            raise ValueError(f"'{attribute}' is read-only attribute")
+        else:
+            raise ValueError(f"'{attribute}' is an invalid attribute")
+
+    def get_client_attributes(self, client_id: str) -> dict:
+        """
+        Gives basic info about a client given a client_id.
+        Returns a dictionary with keys 'is_running', 'timeout', 'addr', 'total_timeouts', and 'max_timeouts'.
+        Raises KeyError if a client with client_id cannot be found
+        """
+        client = self._get_client(client_id)
+        return {
+            "is_running": client.is_running,
+            "timeout": client.timeout,
+            "addr": client.remote_addr,
+            "total_timeouts": client.total_timeouts,
+            "max_timeouts": client.max_timeouts
+        }
 
     def list_clients(self) -> list:
         """
@@ -222,37 +261,20 @@ class TCPServer:
         with self._connected_clients_lock:
             return list(self._connected_clients.keys())
 
-    def get_client_info(self, client_id: str) -> dict:
-        """
-        Gives basic info about a client given a client_id.
-        Returns a dictionary with keys 'is_running', 'timeout', 'addr'.
-        Returns an empty dictionary if a client with client_id cannot be found
-        """
-        client = self._get_client(client_id)
-        if not client:
-            return {}
-        return {
-            "is_running": client.is_running,
-            "timeout": client.timeout,
-            "addr": client.remote_addr,
-        }
-
     def disconnect_client(self, client_id: str) -> bool:
         """
-        Disconnects a client with client_id. Returns False if no client with client_id was connected,
-        True on a successful disconnect.
+        Disconnects a client by id. Raises `KeyError` if the client is not found.
         """
         with self._connected_clients_lock:
             try:
                 client = self._connected_clients[client_id]
-            except KeyError:
-                return False
+            except KeyError: # Re-raise with more specific error message
+                raise KeyError(f"Cannot find client with id #{client_id}")
             del self._connected_clients[client_id]
 
         if client.is_running:
             client.stop(suppress_callback=True)
         logger.info("Client %s has been disconnected.", client_id)
-        return True
 
     def pop_msg(self, block: bool = False, timeout: int = None) -> Message | None:
         """

@@ -85,6 +85,23 @@ def client_list(request):
 @pytest.fixture
 def server():
     s = TCPServer()
+    s.start((HOST, PORT))
+    while not s.is_running:
+        pass
+    yield s
+    s.stop()
+
+
+@pytest.fixture
+def server_no_start():
+    s = TCPServer()
+    yield s
+    s.stop()
+
+@pytest.fixture
+def error_server(request):
+    soc = dummy_soc.SocRaiseErr(excep=request.param[0], func_to_fail=request.param[1])
+    s = TCPServer.from_socket(soc)
     yield s
     s.stop()
 
@@ -130,17 +147,10 @@ def error_client_processor(request, dummy_server):
     p = ClientProcessor(DUMMY_ID, soc, queue.Queue())
     yield p, dummy_server.soc
     p.stop()
-
-
-@pytest.fixture
-def error_server(request):
-    soc = dummy_soc.SocRaiseErr(excep=request.param[0], func_to_fail=request.param[1])
-    s = TCPServer.from_socket(soc)
-    yield s
-    s.stop()
+    dummy_server.stop()
 
 @pytest.fixture
 def on_connect_server():
-    s = dummy_soc.OnConnectServer()
+    s = TCPServer(on_connect=dummy_soc.on_connect)
     yield s
     s.stop()
