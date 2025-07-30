@@ -39,8 +39,12 @@ Represents a message sent over the network.
 
 A TCP server that listens for and manages multiple TCP/IP client connections.
 
-If `max_clients` is 0, the server allows an unlimited number of connections.  
+If `max_clients` is 0, the server allows an unlimited number of connections.
 If `timeout` is None, the server socket has no timeout.
+
+The `on_connect` parameter is a callback function that will run for every new connection. Return 'False' to 
+    disconnect the client. Two arguments will be passed to this function: A TCPClient object and
+    the client's id
 
 ### TCPServer Properties
 - **addr:**  
@@ -70,45 +74,67 @@ If `timeout` is None, the server socket has no timeout.
 
      server = TCPServer.from_socket(soc, max_clients=25)
 
-- **set_clients_timeout(timeout: int):**  
-  Sets the timeout (in seconds) for all currently connected clients.  
-  Returns `True` on success, `False` otherwise.
+
+- **set_client_attribute(timeout: int):**  
+  Set a specific attribute of a client connection. Raises KeyError if the client could not be found
+        Valid attributes are:
+
+  `"timeout"`
+
+  `"max_timeouts"`
+
+
+- **get_client_attributes(client_id: str)**
+  Get information about a client given a client_id.
+  Returns a dictionary with keys `"is_running"`, `"timeout"`, `"addr"`, `"total_timeouts"`, and `"max_timeouts"`.
+  Raises KeyError if a client with client_id cannot be found
+
 
 - **list_clients():**  
-  Returns a list of client IDs for all currently connected clients.
+  Return a list of client IDs for all currently connected clients.
+
 
 - **get_client_info(client_id: str):**  
-  Returns a dictionary with keys `is_running`, `timeout`, and `addr` for the specified client.  
+  Get a dictionary with keys `is_running`, `timeout`, and `addr` for the specified client.  
   Returns `None` if the client cannot be found.
+
 
 - **get_client_attributes(client_id: str):**  
   Returns a dictionary with keys `is_running`, `timeout`, `addr`, `total_timeouts`, and `max_timeouts`.  
   Raises `KeyError` if the client cannot be found.
 
+
 - **set_client_attribute(client_id: str, attribute: str, value):**  
   Sets a specific attribute (`timeout` or `max_timeouts`) for a given client.  
   Raises `KeyError` or `ValueError` if the attribute is invalid or the client doesn't exist.
 
+
 - **disconnect_client(client_id: str):**  
-  Disconnects a client by ID.  
-  Disconnects a client with client_id.  Raises `KeyError` if the client is not found.
+  Disconnect a client by ID. Raises `KeyError` if the client is not found.
+
 
 - **pop_msg(block: bool = False, timeout: int = None):**  
-  Pops the next message from the queue. If `block=True`, will wait until a message is available.  
-  If a `timeout` is provided, the wait is bounded.
+  Pops the next message from the queue. If `block=True`, this method will block until a message is 
+  available. If `block=True` and a value for `timeout` is provided, this method will block for `timeout` seconds 
+  before returning. Returns None if the queue was empty.
+
 
 - **get_all_msg(block: bool = False, timeout: int = None):**  
-  Yields all messages currently in the queue. Supports blocking behavior and optional timeout.
+  A generator for iterating over the message queue. Iteration ends when the queue is empty.
+
 
 - **has_messages():**  
   Returns `True` if the message queue is not empty.
 
+
 - **send(client_id: str, data: bytes):**  
-  Sends data to a specific client.  
-  Returns `True` on success, `False` on failure or if client is not found.
+  Send data to the client with `client_id`. Returns 'True' on successful sending, 'False' if not. Raises `KeyError` if 
+  the client could not be found.
+
 
 - **start(addr: tuple[str, int]):**  
   Starts the server and begins listening on the specified address.
+
 
 - **stop():**  
   Stops the server and disconnects all clients.

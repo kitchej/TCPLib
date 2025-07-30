@@ -23,15 +23,12 @@ class TCPServer:
     """
     Creates, maintains, and transmits data to multiple TCP/IP connections.
 
-    Parameters:
-    - max_clients:
-        A positive integer representing the max number of allowed connections to this server
-    - timeout
-        A positive float or integer representing the timeout of the socket this address will use to accept new connections.
-        Passing 'None' (default) will enable an infinite timeout
-    - on_connect:
-        A callback that will run for every new connection. Return 'False' to disconnect the client.
-        The signature of the functon is expected to be: def on_connect(client: TCPClient, client_id: str)
+    If `max_clients` is 0, the server allows an unlimited number of connections.
+    If `timeout` is None, the server socket has no timeout.
+
+    'on_connect' parameter is a callback function that will run for every new connection. Return 'False' to
+    disconnect the client. Two arguments will be passed to this function: A TCPClient object and
+    the client's id
     """
 
     def __init__(self,
@@ -113,7 +110,7 @@ class TCPServer:
     def _start_client_proc(self, client_id: str, client_soc: socket.socket):
         """
         Contains setup necessary to start a ClientProcessor class with a new client connection and register it to
-        self._connected_clients. Also calls the overridable callback on_connect()
+        self._connected_clients. Also calls the on_connect() callback.
         """
         client = TCPClient.from_socket(client_soc)
         if self._on_connect is not None:
@@ -151,14 +148,14 @@ class TCPServer:
     @property
     def addr(self) -> tuple[str, int]:
         """
-        Returns a tuple with the current address the server is listening on.
+        A tuple representing the address the server is currently bound to. Read-only.
         """
         return self._addr
 
     @property
     def is_running(self) -> bool:
         """
-        Returns a boolean indicating whether the server is set up and running
+        Indicates whether the server is actively listening for connections. Read-only.
         """
         with self._is_running_lock:
             return self._is_running
@@ -166,8 +163,7 @@ class TCPServer:
     @property
     def max_clients(self) -> int:
         """
-        Returns an int representing the maximum allowed connections. Zero indicates that the server will allow infinite
-        connections.
+        A positive integer indicating the maximum allowed client connections.  A value of 0 allows infinite connections.
         """
         return self._max_clients
 
@@ -175,7 +171,7 @@ class TCPServer:
     def max_clients(self, new_max: int):
         """
         Sets the maximum number of allowed connections. The new_max argument should be a positive integer. Setting to
-        zero will allow infinite connections.
+        0 will allow infinite connections.
         """
         if new_max < 0:
             raise ValueError("Value for max_clients should be a positive integer")
@@ -184,16 +180,15 @@ class TCPServer:
     @property
     def timeout(self) -> int | float | None:
         """
-        Returns the timeout of the server's socket object used for listening for new connections
+        Timeout (in seconds) for accepting new connections. A value of `None` disables timeouts.
         """
         return self._timeout
 
     @timeout.setter
     def timeout(self, timeout: int | float | None):
         """
-        Sets timeout (in seconds) of the server's socket object used for listening for new connections. The Timeout
-        argument should be a positive integer. Passing None will set the timeout to infinity. See
-        https://docs.python.org/3/library/socket.html#socket-timeouts for more information about timeouts.
+        Sets timeout (in seconds) of the server. The Timeout argument should be a positive integer. A value of `None`
+        disables timeouts.
         """
         if timeout is not None:
             if timeout < 0:
@@ -205,7 +200,7 @@ class TCPServer:
     @property
     def client_count(self) -> int:
         """
-        Returns and int representing the number of connected clients
+        The number of currently connected clients. Read-only.
         """
         with self._connected_clients_lock:
             return len(self._connected_clients.keys())
@@ -213,7 +208,7 @@ class TCPServer:
     @property
     def is_full(self) -> bool:
         """
-        Returns boolean flag indicating if the server is full
+        Boolean indicating whether the server has reached `max_clients`. Read-only.
         """
         if self._max_clients > 0:
             if self.client_count == self._max_clients:
@@ -222,12 +217,10 @@ class TCPServer:
 
     def set_client_attribute(self, client_id: str, attribute: str, value: any):
         """
-        Sets a specific attribute of a client connection. Raises KeyError if the client could not be found
+        Set a specific attribute of a client connection. Raises KeyError if the client could not be found
         Valid attributes are:
             - 'timeout'
             - 'max_timeouts'
-
-        Raises KeyError if client with client_id could not be found.
         """
         client_proc = self._get_client(client_id)
         if attribute == "timeout":
@@ -241,7 +234,7 @@ class TCPServer:
 
     def get_client_attributes(self, client_id: str) -> dict:
         """
-        Gives basic info about a client given a client_id.
+        Get basic info about a client given a client_id.
         Returns a dictionary with keys 'is_running', 'timeout', 'addr', 'total_timeouts', and 'max_timeouts'.
         Raises KeyError if a client with client_id cannot be found
         """
@@ -256,19 +249,19 @@ class TCPServer:
 
     def list_clients(self) -> list:
         """
-        Returns a list with the client ids of all connected clients
+        Return a list with the client ids of all currently connected clients
         """
         with self._connected_clients_lock:
             return list(self._connected_clients.keys())
 
     def disconnect_client(self, client_id: str) -> bool:
         """
-        Disconnects a client by id. Raises `KeyError` if the client is not found.
+        Disconnect a client by id. Raises `KeyError` if the client is not found.
         """
         with self._connected_clients_lock:
             try:
                 client = self._connected_clients[client_id]
-            except KeyError: # Re-raise with more specific error message
+            except KeyError:
                 raise KeyError(f"Cannot find client with id #{client_id}")
             del self._connected_clients[client_id]
 
@@ -278,42 +271,38 @@ class TCPServer:
 
     def pop_msg(self, block: bool = False, timeout: int = None) -> Message | None:
         """
-        Get the next message in the queue. If block is 'True', this method will block until it can pop something from
-        the queue, else it will try to get a value and return 'None' if queue is empty. If block is 'True' and a timeout
-        is given, block until timeout expires and then return 'None' if no item was received.
-        See  https://docs.python.org/3/library/queue.html#queue.Queue.get for more information
+        Pops the next message from the queue. If `block=True`, will block until a message is
+        available. If `block=True` and a value for `timeout` is provided, block until the timeout expires.
+        Returns None if the queue was empty.
         """
         try:
             return self._messages.get(block=block, timeout=timeout)
         except queue.Empty:
             return
 
-    def get_all_msg(self, block: bool = False, timeout: int = None) -> Generator:
+    def get_all_msg(self) -> Generator:
         """
-        Generator for iterating over the message queue. If block is 'True', each iteration of this method will block until it
-        can pop something from the queue, else it will try to get a value and yield 'None' if queue is empty. If block
-        is 'True' and a timeout is given, block until timeout expires and then yield 'None' if no item was received. See
-        https://docs.python.org/3/library/queue.html#queue.Queue.get for more information.
+        Generator for iterating over the message queue. Iteration ends when the queue is empty.
         """
         while not self._messages.empty():
-            yield self.pop_msg(block=block, timeout=timeout)
+            yield self.pop_msg()
 
     def has_messages(self) -> bool:
         """
-        Returns a boolean indicating if the message queue has any messages
+        Returns `True` if the message queue has messages.
         """
         return not self._messages.empty()
 
     def send(self, client_id: str, data: bytes) -> bool:
         """
-        Sends data to a connected client. Returns 'True' on successful sending, 'False' if not or if a client with
-        client_id could not be found.
+        Send data to the client with `client_id`. Returns 'True' on successful sending, 'False' if not. Raises `KeyError` if
+        the client could not be found.
         """
         with self._connected_clients_lock:
             try:
                 client = self._connected_clients[client_id]
             except KeyError:
-                return False
+                raise KeyError(f"Could not find client with id #{client_id}")
             try:
                 return client.send(data)
             except (ConnectionError, OSError):
