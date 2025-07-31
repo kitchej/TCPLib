@@ -67,12 +67,12 @@ The `on_connect` parameter is a callback function that will run for every new co
   Boolean indicating whether the server has reached `max_clients`. Read-only.
 
 ### TCPServer Methods
-- **from_socket(soc: socket.socket, max_clients: int):**  
+- **`from_socket(soc: socket.socket, max_clients: int):`**  
   Class method that creates a `TCPServer` from an existing bound socket.  
   Returns a new `TCPServer` instance. If bind() or listen() are called on the socket BEFORE TCPServer.start(), an exception will be raised.
 
 
-- **set_client_attribute(timeout: int):**  
+- **`set_client_attribute(timeout: int)`:**  
   Set a specific attribute of a client connection. Raises `KeyError` if the client could not be found.
         Valid attributes are:
 
@@ -81,8 +81,8 @@ The `on_connect` parameter is a callback function that will run for every new co
   `"max_timeouts"`
 
 
-- **get_client_attributes(client_id: str)**
-  Get information about a client given a client_id.
+- **`get_client_attributes(client_id: str)`:**
+  Get information about a client given a client_id. Raises KeyError if a client with client_id cannot be found
   Returns a dictionary with keys: 
 
 - `"is_running"`
@@ -94,9 +94,6 @@ The `on_connect` parameter is a callback function that will run for every new co
 - `"total_timeouts"`
 
 - `"max_timeouts"`
-
-
-Raises KeyError if a client with client_id cannot be found
 
 
 - **`list_clients()`:**  
