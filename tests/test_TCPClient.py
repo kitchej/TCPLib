@@ -462,13 +462,13 @@ class TestTCPClient:
 
         dummy_server.send(b"Hello World!")
         time.sleep(0.1)
-        data = client.receive_bytes(4)
+        data = client.receive_raw(4)
         assert len(data) == 4
         assert data == b"Hell"
 
         dummy_server.send(b"Hello World!")
         time.sleep(0.1)
-        data = client.receive_bytes(12)
+        data = client.receive_raw(12)
         assert len(data) == 12
         assert data == b"o World!Hell"
 
@@ -710,7 +710,7 @@ class TestTCPClient:
         client.connect((HOST, PORT))
 
         with pytest.raises(ValueError):
-            client.receive_bytes(0)
+            client.receive_raw(0)
 
         with pytest.raises(ValueError):
             client.receive(0)
@@ -733,4 +733,4 @@ class TestTCPClient:
                          logging.DEBUG,
                          "test_send_bytes_before_connect-filehandler")
         with pytest.raises(ConnectionError):
-            client.send_bytes(b"hello")
+            client.send_raw(b"hello")

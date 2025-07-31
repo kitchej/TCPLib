@@ -233,7 +233,8 @@ class TestTCPServer:
 
         client_id = server.list_clients()[0]
 
-        assert not server.send("000000000", b"Hello World!")
+        with pytest.raises(KeyError):
+            server.send("000000000", b"Hello World!")
         assert server.send(client_id, b"Hello World!")
 
         msg = client.receive()

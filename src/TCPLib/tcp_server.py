@@ -282,7 +282,7 @@ class TCPServer:
 
     def get_all_msg(self) -> Generator:
         """
-        Generator for iterating over the message queue. Iteration ends when the queue is empty.
+        A generator for iterating over the message queue. Iteration ends when the queue is empty.
         """
         while not self._messages.empty():
             yield self.pop_msg()
@@ -335,7 +335,7 @@ class TCPServer:
 
     def stop(self):
         """
-        Stops the server. If the server is not running, this method will do nothing.
+        Disconnects all clients and shuts down the server. If the server is not running, this method will do nothing.
         """
         if self.is_running:
             with self._connected_clients_lock:

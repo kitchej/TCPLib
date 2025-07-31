@@ -167,7 +167,7 @@ class ClientProcessor:
         """
         if not self.is_running:
             logger.warning("Attempted to send on inactive ClientProcessor %s", self._client_id)
-            return
+            return False
         return self._tcp_client.send(data)
 
     def start(self):
@@ -188,8 +188,8 @@ class ClientProcessor:
     def stop(self, suppress_callback=False):
         """
         Stops the client processor. If the processor is not running, this method does nothing.
-        Set suppress_callback to True to disable on_disconnect callback. This can help prevent deadlocks in cases where
-        the same lock needs to be acquired by both the caller and the callback.
+        If suppress_callback=True, it will disable the on_disconnect callback. This can help prevent deadlocks in cases
+        where the same lock needs to be acquired by both the caller and the callback.
         """
         if self.is_running:
             self._set_is_running(False)
@@ -200,5 +200,9 @@ class ClientProcessor:
                     pass
             self._tcp_client.disconnect()
             if self._on_disconnect is not None and not suppress_callback:
-                self._on_disconnect()
+                try:
+                    self._on_disconnect()
+                except KeyError: # The client may be already disconnected before _on_disconnect() is called. However
+                    pass         # we don't care about the KeyError raised by TCPServer.disconnect_client() because we
+                                 # we're going to disconnect anyway.
             logger.debug("Client %s has been stopped.", self._client_id)
