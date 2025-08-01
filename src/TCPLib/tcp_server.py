@@ -70,7 +70,9 @@ class TCPServer:
         return timestamp_part + random_part
 
     def _mainloop(self):
-        """Mainloop of the server. Listens for connections and attaches it to a ClientProcessor"""
+        """
+        Mainloop of the server. Listens for connections and attaches it to a ClientProcessor
+        """
         logger.debug("Server is listening for connections")
         self._set_is_running(True)
         while self.is_running:
@@ -127,7 +129,9 @@ class TCPServer:
         self._update_connected_clients(client_proc.id, client_proc)
 
     def _get_client(self, client_id: str) -> ClientProcessor:
-        """Thread-safe way to get a connected client from self._connected_clients. Raises KeyError."""
+        """
+        Thread-safe way to get a connected client from self._connected_clients. Raises KeyError.
+        """
         with self._connected_clients_lock:
             try:
                 client = self._connected_clients[client_id]
@@ -136,12 +140,16 @@ class TCPServer:
             return client
 
     def _update_connected_clients(self, client_id: str, client: ClientProcessor):
-        """Thread-safe way to add a connected client to self._connected_clients."""
+        """
+        Thread-safe way to add a connected client to self._connected_clients.
+        """
         with self._connected_clients_lock:
             self._connected_clients.update({client_id: client})
 
     def _set_is_running(self, value: bool):
-        """A thread-safe way of setting the _is_running state of the class"""
+        """
+        A thread-safe way of setting the _is_running state of the class
+        """
         with self._is_running_lock:
             self._is_running = value
 
@@ -254,7 +262,7 @@ class TCPServer:
         with self._connected_clients_lock:
             return list(self._connected_clients.keys())
 
-    def disconnect_client(self, client_id: str) -> bool:
+    def disconnect_client(self, client_id: str):
         """
         Disconnect a client by id. Raises `KeyError` if the client is not found.
         """
@@ -269,7 +277,7 @@ class TCPServer:
             client.stop(suppress_callback=True)
         logger.info("Client %s has been disconnected.", client_id)
 
-    def pop_msg(self, block: bool = False, timeout: int = None) -> Message | None:
+    def pop_msg(self, block: bool = False, timeout: int | float | None = None) -> Message | None:
         """
         Pops the next message from the queue. If `block=True`, will block until a message is
         available. If `block=True` and a value for `timeout` is provided, block until the timeout expires.

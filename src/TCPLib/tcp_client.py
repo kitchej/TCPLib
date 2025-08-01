@@ -16,7 +16,7 @@ class TCPClient:
     A TCP client that can connect to or host a TCP/IP connection.
     """
 
-    def __init__(self, timeout: int = None, is_component=False):
+    def __init__(self, timeout: int | float | None = None, is_component=False):
         self._soc = None
         self._listen_soc = None
         self._peer_addr = None
@@ -94,7 +94,7 @@ class TCPClient:
         if not self._is_component:
             logger.error(log_msg, *log_args)
         self._clean_up()
-        raise exception
+        raise exception.__class__(log_msg % log_args).with_traceback(exception.__traceback__)
 
     @property
     def is_connected(self) -> bool:
@@ -129,19 +129,22 @@ class TCPClient:
 
     @property
     def peer_addr(self) -> tuple[str, int] | None:
-        """Address of the remote host. Returns `None` if disconnected."""
+        """
+        Address of the remote host. Returns `None` if disconnected.
+        """
         return self._peer_addr
 
     @property
     def is_host(self) -> bool:
-        """`True` if the client is acting as a server (host), otherwise `False`."""
+        """
+        `True` if the client is acting as a host, otherwise `False`.
+        """
         return self._is_host
 
-    def host_single_client(self, addr: tuple[str, int], timeout: int | None = None):
+    def host_single_client(self, addr: tuple[str, int], timeout: int | float | None = None):
         """
         Hosts a single connection from a remote TCP/IP client. The timeout argument sets how long this
         method will listen for a connection; 'None' indicates an infinite timeout (default).
-        Raises TimeoutError, ConnectionError, OSError, and socket.gaierror.
         """
         if self._is_connected:
             return
@@ -183,7 +186,7 @@ class TCPClient:
 
     def connect(self, addr: tuple[str, int]):
         """
-        Connects to a remote TCP/IP host. Raises TimeoutError, ConnectionError, OSError, and socket.gaierror.
+        Connects to a remote TCP/IP host.
         """
         if self._is_connected:
             return
@@ -220,9 +223,7 @@ class TCPClient:
 
     def reconnect(self):
         """
-        Attempts to reconnect to the last successfully connected peer. Raises ConnectionError if no prior connection exists.
-        Raises ConnectionError, TimeoutError, OSError, and socket.gaierror
-
+        Attempts to reconnect to the last successfully connected peer.
         """
         if not self._last_connected_peer[0] or not self._last_connected_peer[1]:
             raise ConnectionError("No previous connection available to reconnect to")
@@ -231,19 +232,21 @@ class TCPClient:
         try:
             self.connect(self._last_connected_peer)
         except (TimeoutError, ConnectionError, OSError, socket.gaierror) as e:
-            logger.warning("Reconnect attempt to %s @ %d failed",
-                           self._last_connected_peer[0], self._last_connected_peer[1])
-            raise e
+            self._handle_error(e, "Reconnect attempt to %s @ %d failed", self._last_connected_peer[0], self._last_connected_peer[1])
 
     def disconnect(self):
-        """Gracefully disconnects from the remote host. If no connection is opened, this method does nothing."""
+        """
+        Gracefully disconnects from the remote host. If no connection is opened, this method does nothing.
+        """
         if self._is_connected:
             self._clean_up()
             if not self._is_component:
                 logger.info("Disconnected from %s @ %d",                                                                                                                     self._last_connected_peer[0], self._last_connected_peer[1])
 
     def send_raw(self, data: bytes) -> bool:
-        """Send raw bytes with no size header. Raises TimeoutError, ConnectionError, and OSError."""
+        """
+        Send data with no size header.
+        """
         if not self._is_connected:
             raise ConnectionError("Client is not connected to a host")
         try:
@@ -262,15 +265,16 @@ class TCPClient:
             self._handle_error(e, "OSError while sending to %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
 
     def send(self, data: bytes) -> bool:
-        """Send raw bytes with a 4 byte size header. Raises TimeoutError, ConnectionError, and OSError."""
+        """
+        Send data with a 4 byte size header.
+        """
         if not self._is_connected:
             raise ConnectionError("Client is not connected to a host")
         return self.send_raw(encode_msg(data))
 
     def receive_raw(self, size: int) -> bytes:
         """
-        Receives exactly `size` bytes. Returns empty bytes on connection closure.
-        Raises `TimeoutError`, `ConnectionError`, or `OSError`.
+        Receives exactly `size` bytes. Returns an empty bytes object on connection closure.
         """
         if not self.is_connected:
             raise ConnectionError("Client is not connected to a host")
@@ -294,8 +298,8 @@ class TCPClient:
 
     def iter_receive(self, buff_size: int = 4096, suppress_logs=False) -> Generator:
         """
-        Generator that yields chunks of a message. First yield is the total message size. Raises
-        TimeoutError, ConnectionError, and OSError.
+        Generator that yields chunks of a message. First yield is the total message size.
+        This method expects a 4 bytes size header to be attached.
         """
         if not self._is_connected:
             raise ConnectionError("Client is not connected to a host")
@@ -328,9 +332,8 @@ class TCPClient:
 
     def receive(self, buff_size: int = 4096, suppress_logs=False) -> bytearray:
         """
-        Receives a full message as a `bytearray`. This method expects a 4 bytes size header to be attached.
-        Returns empty `bytearray` on failure or closed connection.
-        Raises TimeoutError, ConnectionError, and OSError.
+        Receives a full message as a bytearray. This method expects a 4 bytes size header to be attached.
+        Returns empty bytearray on failure or closed connection. This method expects a 4 bytes size header to be attached.
         """
         if not self._is_connected:
             raise ConnectionError("Client is not connected to a host")
