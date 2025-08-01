@@ -5,7 +5,7 @@
 **⚠️ This module was made for educational purposes and should not be considered secure.**
 
 TCPLib is a module for setting up a simple TCP client and server. All data is sent as a bytes-like object (```bytes``` or ```bytearray```). 
-All data received by TCPClient is returned as a ```bytearray```. Data received bu TCPServer is returned as a ```Message``` object.
+All data received by a TCPClient object is returned as a ```bytearray```. Data received by a TCPServer object is returned as a ```Message``` object.
 
 ### Example:
 
