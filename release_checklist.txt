@@ -1,0 +1,7 @@
+BEFORE RELEASE:
+
+✓ Version has been updated in pyproject.toml
+✓ Tests are passing
+✓ Docstrings and docs are updated and proofread
+✓ Code examples are updated and added to readme
+✓ Readme is updated
