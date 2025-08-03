@@ -99,11 +99,12 @@ class TCPServer:
                     logger.warning("%s @ %d was disconnected while setting up it's client processor",
                                    client_addr[0], client_addr[1])
                 continue
-            except AttributeError:  # Socket was closed from another thread
+            except AttributeError:  # Possibly raised if the socket was closed from another thread
                 self.stop()
                 break
-            except OSError:
-                logger.exception("OSError raised while listening for connections")
+            except OSError:  # Possibly raised if the socket was closed from another thread
+                if logger.getEffectiveLevel() == logging.DEBUG:
+                    logger.error("OSError raised while listening for connections")
                 self.stop()
                 break
 

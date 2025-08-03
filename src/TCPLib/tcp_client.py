@@ -94,7 +94,7 @@ class TCPClient:
         if not self._is_component:
             logger.error(log_msg, *log_args)
         self._clean_up()
-        raise exception.__class__(log_msg % log_args).with_traceback(exception.__traceback__)
+        raise exception.__class__(log_msg % log_args)
 
     @property
     def is_connected(self) -> bool:

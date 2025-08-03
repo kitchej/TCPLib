@@ -1,3 +1,5 @@
+from src.TCPLib.tcp_client import TCPClient
+
 # TCPLib Public API Documentation
 
 ## Table of Contents
@@ -70,7 +72,7 @@ A TCP server that listens for and manages multiple TCP/IP client connections.
 ### TCPServer Methods
 
 - `from_socket(soc: socket.socket, max_clients: int)`  
-  Class method that creates a `TCPServer` object from an existing bound socket.  
+  Class method that creates a `TCPServer` object from an existing socket.  
   Returns a new `TCPServer` instance.  
   > ⚠️ If `bind()` or `listen()` are called on the socket **before** `TCPServer.start()`, an exception will be raised.
 
@@ -83,8 +85,7 @@ A TCP server that listens for and manages multiple TCP/IP client connections.
 
 
 - `get_client_attributes(client_id: str)`  
-  Returns a dictionary of information about the client with the given `client_id`.  
-  Raises `KeyError` if the client is not found.  
+  Returns a dictionary of information about the client with the given `client_id`. Raises `KeyError` if the client is not found.  
   Keys include:
   - `is_running`
   - `timeout`
@@ -109,8 +110,7 @@ A TCP server that listens for and manages multiple TCP/IP client connections.
 
 
 - `get_all_msg()`  
-  Generator for iterating over all messages in the queue.  
-  Iteration ends when the queue is empty.
+  Generator for iterating over all messages in the queue. Iteration ends when the queue is empty.
 
 
 - `has_messages()`  
@@ -118,18 +118,15 @@ A TCP server that listens for and manages multiple TCP/IP client connections.
 
 
 - `send(client_id: str, data: bytes)`  
-  Sends data to the client with the specified `client_id`.  
-  Returns `True` on success, `False` on failure.  
-  Raises `KeyError` if the client is not found.
+  Sends data to the client with the specified `client_id`. Returns `True` on success, `False` on failure. Raises `KeyError` if the client is not found.
 
 
 - `start(addr: tuple[str, int])`  
-  Starts the server and begins listening on the specified address.
+Starts the server and begins listening on the specified address.
 
 
 - `stop()`  
-  Disconnects all clients and shuts down the server.  
-  If the server is not running, this method does nothing.
+  Disconnects all clients and shuts down the server. If the server is not running, this method does nothing.
 
 ---
 
@@ -146,7 +143,7 @@ A TCP client that can connect to or host a TCP/IP connection.
 
 
 - `timeout`  
-  Timeout (in seconds) for socket operations. A value of `None` disables timeouts.
+  Timeout (in seconds) for network operations. A value of `None` disables timeouts.
 
 
 - `local_addr`  
@@ -163,15 +160,12 @@ A TCP client that can connect to or host a TCP/IP connection.
 ### TCPClient Methods
 
 - `from_socket(soc: socket.socket, is_listen_soc=False)`  
-  Creates a client from an existing socket.  
-  Overrides the socket timeout when `connect()` or `host_single_client()` is called.  
-  Returns a new `TCPClient` object.  
+  Creates a client from an existing socket. Overrides the socket timeout when `connect()` or `host_single_client()` is called. Returns a new `TCPClient` object.  
   > ⚠️ If `bind()` or `listen()` is called on the socket before calling `host_single_client()` or `connect()`, both methods will raise an exception.
 
 
 - `host_single_client(addr: tuple[str, int], timeout: int = None)`  
-  Hosts a single connection from a remote TCP/IP client.  
-  The `timeout` argument defines how long to listen; `None` means wait indefinitely.
+  Hosts a single connection from a remote TCP/IP client. The `timeout` argument defines how long to listen; `None` means wait indefinitely.
 
 
 - `connect(addr: tuple[str, int])`  
@@ -179,13 +173,11 @@ A TCP client that can connect to or host a TCP/IP connection.
 
 
 - `reconnect()`  
-  Attempts to reconnect to the last successfully connected peer.  
-  Raises `ConnectionError` if no previous connection exists.
+  Attempts to reconnect to the last successfully connected peer. Raises `ConnectionError` if no previous connection exists.
 
 
 - `disconnect()`  
-  Gracefully disconnects from the remote host.  
-  If not connected, this method does nothing.
+  Gracefully disconnects from the remote host. If not connected, this method does nothing.
 
 
 - `send_raw(data: bytes)`  
@@ -197,19 +189,31 @@ A TCP client that can connect to or host a TCP/IP connection.
 
 
 - `receive_raw(size: int)`  
-  Receives exactly `size` bytes.  
-  Returns an empty bytes object if the socket is closed.
+  Receives exactly `size` bytes. Returns an empty bytes object if the socket is closed.
 
 
 - `iter_receive(buff_size: int = 4096)`  
-  Generator that yields chunks of a message.  
-  Expects a 4-byte size header.  
-  The first yield will always be the total message size.
+  Generator that yields chunks of a message. Expects a 4-byte size header. The first yield will always be the total message size.
+  Useful for keeping track of progress when receiving large messages.
 
+  Example:
+  
+
+```python
+from TCPLib import TCPClient
+client = TCPClient()
+# ...
+reply = bytearray()
+reply_generator = client.iter_receive()
+size = next(reply_generator)
+bytes_recv = 0
+for chunk in reply_generator:
+    bytes_recv += len(chunk)
+    reply.extend(chunk)
+    print(f"Received: {bytes_recv}/{size} bytes")
+```
 
 - `receive(buff_size: int = 4096)`  
-  Receives a full message as a `bytearray`.  
-  Returns an empty `bytearray` on failure or closed connection.  
-  Expects a 4-byte size header.
+  Receives a full message as a `bytearray`. Returns an empty `bytearray` on failure or closed connection. Expects a 4-byte size header.
 
 ---
