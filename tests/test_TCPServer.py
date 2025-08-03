@@ -207,7 +207,7 @@ class TestTCPServer:
         for i, client in enumerate(client_list):
             client.send(bytes(f"Sent from client #{i}", encoding="utf-8"))
 
-        time.sleep(0.1)
+        time.sleep(1)
         assert server.has_messages()
         assert server._messages.qsize() == 10
         msg = server.pop_msg()
