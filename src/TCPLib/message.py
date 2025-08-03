@@ -6,8 +6,7 @@ Written by: Joshua Kitchen - 2024
 
 class Message:
     """
-    Container class for holding the size and data of a message.
-    A message where size = 0 and data = None indicates the connection was closed
+    Represents a message sent over the network.
     """
     def __init__(self, size, data, client_id=None):
         self.size = size

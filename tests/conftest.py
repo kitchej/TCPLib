@@ -24,6 +24,10 @@ def pytest_collection_modifyitems(items):
     https://stackoverflow.com/questions/70738211/run-pytest-classes-in-custom-order/70758938#70758938
 
     Modifies test items in place to ensure test classes run in a given order.
+
+    This is necessary since the library's classes are dependent on each other. A TCPServer object has many
+    ClientProcessor objects, and every ClientProcessor object has a TCPClient object. In other words, if a composed class
+    fails its testing, the container class will most likely fail its tests too.
     """
     CLASS_ORDER = ["TestClientProcessor", "TestTCPClient", "TestUtils"]
     class_mapping = {item: item.cls.__name__ for item in items}
@@ -33,6 +37,9 @@ def pytest_collection_modifyitems(items):
         sorted_items = [it for it in sorted_items if class_mapping[it] == class_] + \
                        [it for it in sorted_items if class_mapping[it] != class_]
     items[:] = sorted_items
+
+    for item in items:
+        item.add_marker(pytest.mark.timeout(20))
 
 
 def setup_log_folder(folder_name):
@@ -48,7 +55,7 @@ def setup_log_folder(folder_name):
 @pytest.fixture
 def dummy_server():
     time.sleep(0.1)
-    s = dummy_soc.DummyServer(HOST, PORT)
+    s = dummy_soc.DummyServer()
     yield s
     s.stop()
 
@@ -78,12 +85,29 @@ def client_list(request):
 @pytest.fixture
 def server():
     s = TCPServer()
+    s.start((HOST, PORT))
+    while not s.is_running:
+        pass
+    yield s
+    s.stop()
+
+
+@pytest.fixture
+def server_no_start():
+    s = TCPServer()
+    yield s
+    s.stop()
+
+@pytest.fixture
+def error_server(request):
+    soc = dummy_soc.SocRaiseErr(excep=request.param[0], func_to_fail=request.param[1])
+    s = TCPServer.from_socket(soc)
     yield s
     s.stop()
 
 @pytest.fixture
 def client_processor(dummy_client, dummy_server):
-    dummy_server.start()
+    dummy_server.start((HOST, PORT))
     dummy_client.connect((HOST, PORT))
     time.sleep(0.1)
     p = ClientProcessor(DUMMY_ID, dummy_server.soc, queue.Queue())
@@ -93,36 +117,40 @@ def client_processor(dummy_client, dummy_server):
     dummy_server.stop()
 
 @pytest.fixture
+def error_host_client(request):
+    soc = dummy_soc.SocRaiseErr(excep=request.param[0], func_to_fail=request.param[1])
+    c = TCPClient.from_socket(soc, is_listen_soc=True)
+    yield c
+    c.disconnect()
+
+@pytest.fixture
 def error_client(request):
     soc = dummy_soc.SocRaiseErr(excep=request.param[0], func_to_fail=request.param[1])
     c = TCPClient.from_socket(soc)
     yield c
     c.disconnect()
 
+@pytest.fixture
+def error_reconnect_client(request):
+    soc = dummy_soc.SocRaiseErr(excep=request.param[0], func_to_fail=request.param[1])
+    c = TCPClient.from_socket(soc)
+    c._last_connected_peer = (HOST, PORT)
+    yield c
+    c.disconnect()
 
 @pytest.fixture
 def error_client_processor(request, dummy_server):
     soc = dummy_soc.SocRaiseErr(excep=request.param[0], func_to_fail=request.param[1])
-    dummy_server.start()
+    dummy_server.start((HOST, PORT))
     soc.connect((HOST, PORT))
     time.sleep(0.1)
-    p = ClientProcessor(DUMMY_ID, dummy_server.soc, queue.Queue())
-    yield p, soc
+    p = ClientProcessor(DUMMY_ID, soc, queue.Queue())
+    yield p, dummy_server.soc
     p.stop()
-    soc.close()
     dummy_server.stop()
-
-
-@pytest.fixture
-def error_server(request):
-    soc = dummy_soc.SocRaiseErr(excep=request.param[0], func_to_fail=request.param[1])
-    soc.bind((HOST, PORT))
-    s = TCPServer.from_socket(soc)
-    yield s
-    s.stop()
 
 @pytest.fixture
 def on_connect_server():
-    s = dummy_soc.OnConnectServer()
+    s = TCPServer(on_connect=dummy_soc.on_connect)
     yield s
     s.stop()
