@@ -20,6 +20,7 @@ classifiers = [
 [project.urls]
 Homepage = "https://github.com/kitchej/TCPLib"
 Issues = "https://github.com/kitchej/TCPLib/issues"
+Documentation = "https://github.com/kitchej/TCPLib/blob/master/Documentation/docs.md"
 
 [tool.pytest.ini_options]
 minversion = "6.0"
