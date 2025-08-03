@@ -229,6 +229,8 @@ class TestClientProcessor:
         with caplog.at_level(logging.DEBUG):
             processor.start()
             processor.stop()
+            while processor.is_running:
+                pass
             processor.stop()
 
         assert len([record for record in caplog.records if "has been stopped." in record.msg]) == 1

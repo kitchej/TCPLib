@@ -1,6 +1,6 @@
 BEFORE RELEASE:
 
-✓ Version has been updated in pyproject.toml
+✓ Version has been updated in pyproject.toml and python-package.yml
 ✓ Tests are passing
 ✓ Docstrings and docs are updated and proofread
 ✓ Code examples are updated and added to readme

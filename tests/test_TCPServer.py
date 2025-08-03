@@ -288,7 +288,8 @@ class TestTCPServer:
 
         with caplog.at_level(logging.INFO):
             server.stop()
-            time.sleep(0.1)
+            while server.is_running:
+                pass
             server.stop()
             time.sleep(0.1)
 
