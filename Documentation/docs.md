@@ -132,7 +132,7 @@ Starts the server and begins listening on the specified address.
 
 ## TCPClient
 
-### `TCPClient(self, timeout: int = None)`
+### `TCPClient(self, timeout: int | float | None = None, is_component=False)`
 
 A TCP client that can connect to or host a TCP/IP connection.
 
