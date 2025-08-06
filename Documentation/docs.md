@@ -35,7 +35,7 @@ Represents a message sent over the network.
 
 ## TCPServer
 
-### `TCPServer(self, max_clients: int = 0, timeout: int = None)`
+### `TCPServer(max_clients: int = 0,timeout: int | float | None = None, on_connect: Callable[[TCPClient, str], bool] | None = None):`
 
 A TCP server that listens for and manages multiple TCP/IP client connections.
 
