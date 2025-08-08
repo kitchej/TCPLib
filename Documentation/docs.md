@@ -35,7 +35,7 @@ Represents a message sent over the network.
 
 ## TCPServer
 
-### `TCPServer(max_clients: int = 0,timeout: int | float | None = None, on_connect: Callable[[TCPClient, str], bool] | None = None):`
+### `TCPServer(max_clients: int = 0, timeout: int | float | None = None, on_connect: Callable[[TCPClient, str], bool] | None = None):`
 
 A TCP server that listens for and manages multiple TCP/IP client connections.
 
@@ -135,6 +135,10 @@ Starts the server and begins listening on the specified address.
 ### `TCPClient(self, timeout: int | float | None = None, is_component=False)`
 
 A TCP client that can connect to or host a TCP/IP connection.
+
+The `is_component` argument indicates that TCPClient is a member of another class, specifically a ClientProcessor. This will supress log
+messages in _handle_error(), receive_bytes(), send_bytes(), and disconnect(), since ClientProcessor
+already has its own logging for these functions.
 
 ### TCPClient Properties
 
