@@ -109,6 +109,7 @@ Install via pip:
 #### TCPServer
 
 - Updated client ID generation to a simpler, more reliable method with better uniqueness.
+- Instead of `on_connect` being an overridable method, it is now a callback function passed to `TCPSerer.__init__()`. This saves the end user from having to subclass TCPServer just to use this functionality.
 - The server now tracks timeouts for each client. You can configure both `timeout` and `max_timeouts` per client using `set_client_attributes()` (formerly `set_clients_timeout()`).
 - The `get_all_msg()` method no longer accepts `block` or `timeout` parameters. Its purpose is to retrieve already-queued messages, so blocking is unnecessary in hindsight.
 
