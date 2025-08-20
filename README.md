@@ -59,7 +59,7 @@ Received message from server: Hello World!
 
 ---
 
-It is also possible for a `TCPClient` object to host a single TCP/IP connection.  
+It is also possible for a `TCPClient` object to host a single TCP connection.  
 Below is an example where `client.py` connects to a host client instead of a server:
 
 #### `host_client.py`
@@ -97,7 +97,16 @@ Install via pip:
 
 ---
 
-### What's New in 2.0.0
+### Bug fixes for 2.0.1
+#### TCPServer
+- When a client disconnects, an empty message is now put in the message queue. This makes it easier for applications 
+to know when a client connection has been closed. I had originally included this behavior in an older development version, and it's
+a mystery why it was removed.
+- Fixed a bug where logging errors were being caught and handled like module errors. I went ahead and evaluated *all* try/except
+blocks and moved excess code out them.
+- Revised some of the logging.
+
+### What's New in Version 2.x
 
 #### General
 
@@ -120,5 +129,3 @@ Install via pip:
   - `local_addr()` always returns the address assigned to the class.
   - `peer_addr()` always returns the address of the connected remote peer.
 - Renamed `send_bytes()` and `receive_bytes()` to `send_raw()` and `receive_raw()`, respectively. The old names were misleading as all data in this library is sent as bytes. The new names for these methods better reflect their intended purpose.
-
----

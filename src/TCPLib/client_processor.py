@@ -7,7 +7,6 @@ import logging
 import socket
 import threading
 import queue
-from contextlib import suppress
 from functools import partial
 
 from .message import Message
@@ -18,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 class ClientProcessor:
     """
-    Maintains a single TCP/IP client connection.
+    Maintains a single TCP client connection.
     Pass a callback to on_disconnect to enable certain actions to be taken when stop() is called.
     """
 
@@ -60,17 +59,13 @@ class ClientProcessor:
                     self._total_timeouts += 1
                     if self._max_timeouts is not None:
                         if self._total_timeouts >= self._max_timeouts:
-                            logger.error("Client %s timed out too many times. Disconnecting.", self._client_id)
+                            logger.warning("Client %s timed out too many times. Disconnecting.", self._client_id)
                             self.stop()
                             return
                 continue
             except ConnectionError:
-                # Since this thread runs in the background, it's common to get connection errors during normal
-                # operation since disconnecting can happen outside this thread. For this reason, we only need to log
-                # this exception during debugging
-                if logger.getEffectiveLevel() == logging.DEBUG:
-                    logger.error("Connection error while receiving from %s @ %d", self.remote_addr[0],
-                                     self.remote_addr[1])
+                logger.debug("Receive loop for client #%s on %s @ %d was interrupted", self._client_id, self.remote_addr[0],
+                             self.remote_addr[1])
                 self.stop()
                 return
             except OSError:
@@ -80,7 +75,8 @@ class ClientProcessor:
                 return
 
             if len(data) == 0:
-                logger.info("Received empty data from client %s, stopping", self._client_id)
+                logger.exception("Empty data from %s @ %d, disconnecting", self.remote_addr[0],
+                                 self.remote_addr[1])
                 self.stop()
                 return
 
@@ -199,10 +195,10 @@ class ClientProcessor:
                 except RuntimeError:  # ...unless it already did
                     pass
             self._tcp_client.disconnect()
+            self._msg_q.put(Message(0, bytes(), self._client_id))
             if self._on_disconnect is not None and not suppress_callback:
                 try:
                     self._on_disconnect()
                 except KeyError: # The client may be already disconnected before _on_disconnect() is called. However
                     pass         # we don't care about the KeyError raised by TCPServer.disconnect_client() because we
                                  # we're going to disconnect anyway.
-            logger.debug("Client %s has been stopped.", self._client_id)
