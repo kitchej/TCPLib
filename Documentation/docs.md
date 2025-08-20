@@ -17,7 +17,7 @@ from src.TCPLib.tcp_client import TCPClient
 
 ### `Message(self, size, data, client_id=None)`
 
-Represents a message sent over the network.
+Represents a message sent over the network. A message of size `0` indicates the connection has been terminated.
 
 #### Properties
 - `size`  
@@ -37,7 +37,7 @@ Represents a message sent over the network.
 
 ### `TCPServer(max_clients: int = 0, timeout: int | float | None = None, on_connect: Callable[[TCPClient, str], bool] | None = None):`
 
-A TCP server that listens for and manages multiple TCP/IP client connections.
+A TCP server that listens for and manages multiple TCP client connections.
 
 - If `max_clients` is `0`, the server allows an unlimited number of connections.  
 - If `timeout` is `None`, the server socket has no timeout.  
@@ -105,12 +105,15 @@ A TCP server that listens for and manages multiple TCP/IP client connections.
 - `pop_msg(block: bool = False, timeout: int = None)`  
   Pops the next message from the message queue.  
   - If `block=True`, the method blocks until a message is available.  
-  - If `block=True` and `timeout` is set, the method blocks for `timeout` seconds before returning.  
+  - If `block=True` and `timeout` is set, the method blocks for `timeout` seconds before returning.
+  
   Returns `None` if the queue is empty.
+  A message of size `0` indicates the connection has been terminated.
 
 
 - `get_all_msg()`  
-  Generator for iterating over all messages in the queue. Iteration ends when the queue is empty.
+  Generator for iterating over all messages in the queue. Iteration ends when the queue is empty. 
+  A message of size `0` indicates the connection has been terminated.
 
 
 - `has_messages()`  
@@ -134,7 +137,7 @@ Starts the server and begins listening on the specified address.
 
 ### `TCPClient(self, timeout: int | float | None = None, is_component=False)`
 
-A TCP client that can connect to or host a TCP/IP connection.
+A TCP client that can connect to or host a TCP connection.
 
 The `is_component` argument indicates that TCPClient is a member of another class, specifically a ClientProcessor. This will supress log
 messages in _handle_error(), receive_bytes(), send_bytes(), and disconnect(), since ClientProcessor
@@ -165,15 +168,15 @@ already has its own logging for these functions.
 
 - `from_socket(soc: socket.socket, is_listen_soc=False)`  
   Creates a client from an existing socket. Overrides the socket timeout when `connect()` or `host_single_client()` is called. Returns a new `TCPClient` object.  
-  > ⚠️ If `bind()` or `listen()` is called on the socket before calling `host_single_client()` or `connect()`, both methods will raise an exception.
+  > ⚠️ If `bind()` or `listen()` are called on the socket before calling `TCPClient.host_single_client()` or `TCPClient.connect()`, both methods will raise an exception.
 
 
 - `host_single_client(addr: tuple[str, int], timeout: int = None)`  
-  Hosts a single connection from a remote TCP/IP client. The `timeout` argument defines how long to listen; `None` means wait indefinitely.
+  Hosts a single connection from a remote TCP client. The `timeout` argument defines how long to listen; `None` means wait indefinitely.
 
 
 - `connect(addr: tuple[str, int])`  
-  Connects to a remote TCP/IP host.
+  Connects to a remote TCP host.
 
 
 - `reconnect()`  

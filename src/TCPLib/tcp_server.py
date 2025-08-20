@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 class TCPServer:
     """
-    Creates, maintains, and transmits data to multiple TCP/IP connections.
+    Creates, maintains, and transmits data to multiple TCP connections.
 
     If `max_clients` is 0, the server allows an unlimited number of connections.
     If `timeout` is None, the server socket has no timeout.
@@ -79,12 +79,6 @@ class TCPServer:
             client_soc, client_addr = None, None
             try:
                 client_soc, client_addr = self._soc.accept()
-                if self.is_full:
-                    logger.warning("%s @ %d was denied connection due to server being full",
-                                   client_addr[0], client_addr[1])
-                    client_soc.close()
-                    continue
-                self._start_client_proc(self._generate_client_id(), client_soc)
             except TimeoutError:
                 if client_addr is None:
                     logger.warning("New connection timed out before connection could be accepted")
@@ -107,6 +101,13 @@ class TCPServer:
                     logger.error("OSError raised while listening for connections")
                 self.stop()
                 break
+
+            if self.is_full:
+                logger.warning("%s @ %d was denied connection due to server being full",
+                               client_addr[0], client_addr[1])
+                client_soc.close()
+                continue
+            self._start_client_proc(self._generate_client_id(), client_soc)
 
         logger.debug("Server is no longer listening for messages")
 

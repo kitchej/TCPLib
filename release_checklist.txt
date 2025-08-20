@@ -1,4 +1,5 @@
 BEFORE RELEASE:
+✓ <- leave there for copying and pasting
 
 ✓ Version has been updated in pyproject.toml and python-package.yml
 ✓ Tests are passing

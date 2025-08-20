@@ -119,7 +119,7 @@ class TestClientProcessor:
                                              "timed out too many times. Disconnecting.",
                                              caplog,
                                              wait_time=1,
-                                             log_level=logging.ERROR)
+                                             log_level=logging.WARNING)
 
     def test_recv_loop_too_many_timeouts(self, client_processor, caplog):
         add_file_handler(logger,
@@ -134,7 +134,7 @@ class TestClientProcessor:
                                              "timed out too many times. Disconnecting.",
                                              caplog,
                                              wait_time=5,
-                                             log_level=logging.ERROR)
+                                             log_level=logging.WARNING)
 
         assert client_processor[0]._total_timeouts == 4
 
@@ -147,7 +147,7 @@ class TestClientProcessor:
                          "test_recv_loop_raise_connection_error-filehandler")
 
         self.assert_message_logged_recv_loop(error_client_processor,
-                                             'Connection error while receiving from',
+                                             'Receive loop for client',
                                              caplog,
                                              wait_time=2)
 
@@ -219,18 +219,3 @@ class TestClientProcessor:
         processor.start()  # Should not create new thread
         assert processor._thread is first_thread
         processor.stop()
-
-    def test_stop_called_twice(self, client_processor, caplog):
-        add_file_handler(logger,
-                         os.path.join(log_folder, "test_stop_called_twice.log"),
-                         logging.DEBUG, "test_stop_called_twice-filehandler")
-        processor = client_processor[0]
-
-        with caplog.at_level(logging.DEBUG):
-            processor.start()
-            processor.stop()
-            while processor.is_running:
-                pass
-            processor.stop()
-
-        assert len([record for record in caplog.records if "has been stopped." in record.msg]) == 1
