@@ -172,10 +172,8 @@ class TCPClient:
             client_soc, client_addr = self._listen_soc.accept()
         except TimeoutError as e:
             self._handle_error(e, "Timed out while attempting to connect to remote client")
-            return
         except ConnectionError as e:
             self._handle_error(e, "Failed to establish connection to remote client")
-            return
 
         self._soc = client_soc
         self._peer_addr = client_addr
@@ -213,16 +211,12 @@ class TCPClient:
             self._soc.connect(self._peer_addr)
         except TimeoutError as e:
             self._handle_error(e, "Timed out while attempting to connect to %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
-            return
         except ConnectionError as e:
             self._handle_error(e, "Could not connect to %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
-            return
         except socket.gaierror as e:
             self._handle_error(e, "Could not resolve address %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
-            return
         except OSError as e:
             self._handle_error(e, "OSError while connecting to %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
-            return
 
         self._is_connected = True
         self._is_host = False
@@ -268,10 +262,8 @@ class TCPClient:
             raise e
         except ConnectionError as e:
             self._handle_error(e, "Connection error while sending to %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
-            return
         except OSError as e:
             self._handle_error(e, "OSError while sending to %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
-            return
         return True
 
     def send(self, data: bytes) -> bool:
@@ -301,10 +293,8 @@ class TCPClient:
             raise e
         except ConnectionError as e:
             self._handle_error(e, "Connection error while receiving from %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
-            return
         except OSError as e:
             self._handle_error(e, "OSError while receiving from %s @ %d", self._last_connected_peer[0], self._last_connected_peer[1])
-            return
 
         return data
 

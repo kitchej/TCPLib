@@ -97,14 +97,10 @@ Install via pip:
 
 ---
 
-### Bug fixes for 2.0.1
-#### TCPServer
-- When a client disconnects, an empty message is now put in the message queue. This makes it easier for applications 
-to know when a client connection has been closed. I had originally included this behavior in an older development version, and it's
-a mystery why it was removed.
-- Fixed a bug where logging errors were being caught and handled like module errors. I went ahead and evaluated *all* try/except
-blocks and moved excess code out them.
-- Revised some of the logging.
+### Bug fixes for 2.0.2
+#### General
+- Minor improvements to thread safety
+- Evaluated code coverage and removed redundant code
 
 ### What's New in Version 2.x
 

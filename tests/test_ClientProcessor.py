@@ -49,7 +49,7 @@ class TestClientProcessor:
             if not found:
                 raise AssertionError(f"Could not find \"{expected_txt}\" in logs")
 
-    def test_class_state(self, client_processor):
+    def test_class_state(self, client_processor, caplog):
         add_file_handler(logger,
                          os.path.join(log_folder, "test_class_state.log"),
                          logging.DEBUG,
@@ -90,6 +90,11 @@ class TestClientProcessor:
 
         processor.stop()
         self.assert_default_state(processor)
+
+        with caplog.at_level(logging.WARNING):
+            processor.send(b"Hello World")
+            time.sleep(0.1)
+            assert any("" in record.msg for record in caplog.records)
 
     """Test error handling in _receive_loop"""
 

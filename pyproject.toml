@@ -9,7 +9,7 @@ authors = [
 ]
 description = "A basic library for implementing a TCP client/server"
 readme = "README.md"
-version='2.0.1'
+version='2.0.2'
 requires-python = ">=3.10"
 license = "MIT"
 classifiers = [
@@ -24,3 +24,22 @@ Documentation = "https://github.com/kitchej/TCPLib/blob/master/Documentation/doc
 
 [tool.pytest.ini_options]
 minversion = "6.0"
+
+[tool.coverage.run]
+omit = [
+    "tests/dummy_soc.py",
+    "tests/conftest.py",
+    "tests/globals_for_tests.py"
+]
+include = [
+    ".venv/Lib/site-packages/TCPLib/*",
+    "tests/test_*"
+]
+
+[tool.coverage.report]
+exclude_also = [
+    "def __repr__",
+    "logger.debug",
+    "pass", # Ignore 'pass' statments in while loops that are blocking the test until a server/client to comes online
+    "raise AssertionError" # Ignore defensive asserts that only run on test failure
+]

@@ -10,6 +10,8 @@ from globals_for_tests import setup_log_folder, HOST, PORT
 from log_util import add_file_handler
 from TCPLib.tcp_server import TCPServer
 
+from src.TCPLib.client_processor import ClientProcessor
+
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 log_folder = setup_log_folder("TestTCPServer")
@@ -68,9 +70,16 @@ class TestTCPServer:
         assert server_no_start.is_running is True
         server_no_start.max_clients = 10
         assert server_no_start.max_clients == 10
+
+        with pytest.raises(ValueError):
+            server_no_start.max_clients = -1
+
         server_no_start.timeout = 10
         assert server_no_start.timeout == 10
         server_no_start.timeout = None
+
+        with pytest.raises(ValueError):
+            server_no_start.timeout = -1
 
         for i in range(10):
             time.sleep(0.1)
@@ -91,6 +100,10 @@ class TestTCPServer:
 
         server_no_start.disconnect_client(client_ids[0])
         assert server_no_start.is_full is False
+        assert server_no_start.client_count == 9
+
+        with pytest.raises(KeyError):
+            server_no_start.disconnect_client("aaaaaa")
         assert server_no_start.client_count == 9
 
         server_no_start.stop()
@@ -114,8 +127,12 @@ class TestTCPServer:
             server.set_client_attribute(client_id, 'max_timeouts', 29)
             with pytest.raises(ValueError):
                 server.set_client_attribute(client_id, 'is_running', 30)
+            with pytest.raises(ValueError):
                 server.set_client_attribute(client_id, 'addr', 30)
+            with pytest.raises(ValueError):
                 server.set_client_attribute(client_id, 'total_timeouts', 30)
+            with pytest.raises(ValueError):
+                server.set_client_attribute(client_id, 'not-an-attribute', 256)
 
 
         for client_id, client in zip(server.list_clients(), client_list[:11]):
@@ -218,6 +235,7 @@ class TestTCPServer:
             assert m
 
         assert not server.has_messages()
+        assert server.pop_msg() is None
 
     def test_send(self, server, client):
         add_file_handler(logger,

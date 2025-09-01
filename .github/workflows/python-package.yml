@@ -30,10 +30,20 @@ jobs:
         python -m pip install --upgrade pip
         python -m pip install build
         python -m pip install pytest
-    - name: Build and Install Wheel
+        python -m pip install coverage
+    - name: Build and Install Wheel File
       run: |
         python -m build
-        python -m pip install dist/tcplib-2.0.1-py3-none-any.whl
-    - name: Test with pytest
+        python -m pip install dist/tcplib-2.0.2-py3-none-any.whl
+    - name: Test with pytest and coverage
       run: |
-        pytest
+        coverage run -m pytest
+        coverage xml
+    - name: Code Coverage Summary Report
+      uses: irongut/CodeCoverageSummary@v1.3.0
+      with:
+        filename: coverage.xml
+        badge: true
+        threshold: "70 90"
+        output: console
+
