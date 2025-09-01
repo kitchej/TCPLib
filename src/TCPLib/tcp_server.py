@@ -269,10 +269,7 @@ class TCPServer:
         Disconnect a client by id. Raises `KeyError` if the client is not found.
         """
         with self._connected_clients_lock:
-            try:
-                client = self._connected_clients[client_id]
-            except KeyError:
-                raise KeyError(f"Cannot find client with id #{client_id}")
+            client = self._connected_clients[client_id]
             del self._connected_clients[client_id]
 
         if client.is_running:
@@ -348,12 +345,12 @@ class TCPServer:
         Disconnects all clients and shuts down the server. If the server is not running, this method will do nothing.
         """
         if self.is_running:
+            self._set_is_running(False)
             with self._connected_clients_lock:
                 for client in self._connected_clients.values():
                     client.stop(suppress_callback=True)
                 self._connected_clients.clear()
             self._soc.close()
             self._soc = None
-            self._set_is_running(False)
             self._addr = None
             logger.info("Server has been stopped")

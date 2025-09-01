@@ -699,6 +699,50 @@ class TestTCPClient:
         client.connect((HOST, PORT))
         assert client._soc.gettimeout() == 5
 
+    def test_receive_raw_not_connected_and_soc_none(self, client):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "receive_raw_not_connected.log"),
+                         logging.DEBUG,
+                         "receive_raw_not_connected-filehandler")
+
+        with pytest.raises(ConnectionError):
+            client.receive_raw(1)
+
+        client._is_connected = True
+        client._soc = None
+        client.receive_raw(1)
+        self.assert_default_state(client)
+
+    def test_iter_receive_not_connected_and_soc_none(self, client):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_iter_receive_not_connected_and_soc_none.log"),
+                         logging.DEBUG,
+                         "test_iter_receive_not_connected_and_soc_none-filehandler")
+
+        with pytest.raises(ConnectionError):
+            _ = client.iter_receive()
+            next(_)
+
+        client._is_connected = True
+        client._soc = None
+        _ = client.iter_receive()
+        with pytest.raises(StopIteration):
+            next(_)
+        self.assert_default_state(client)
+
+    def test_receive_not_connected_and_soc_none(self, client):
+        add_file_handler(logger,
+                         os.path.join(log_folder, "test_receive_not_connected_and_soc_none.log"),
+                         logging.DEBUG,
+                         "test_receive_not_connected_and_soc_none-filehandler")
+
+        with pytest.raises(ConnectionError):
+            client.receive()
+
+        client._is_connected = True
+        client._soc = None
+        client.receive()
+        self.assert_default_state(client)
 
     def test_receive_buffsize_zero(self, client, dummy_server):
         add_file_handler(logger,
@@ -716,8 +760,8 @@ class TestTCPClient:
             client.receive(0)
 
         with pytest.raises(ValueError):
-            for chunk in client.iter_receive(0):
-                print(chunk)
+           _ =  client.iter_receive(0)
+           next(_)
 
     def test_send_before_connect(self, client):
         add_file_handler(logger,
