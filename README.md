@@ -1,4 +1,4 @@
-# TCPLib
+# TCPLib [![Coverage Status](https://coveralls.io/repos/github/kitchej/TCPLib/badge.svg?branch=master)](https://coveralls.io/github/kitchej/TCPLib?branch=master)
 
 ---
 
