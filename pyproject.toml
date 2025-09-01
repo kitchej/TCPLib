@@ -32,7 +32,7 @@ omit = [
     "tests/globals_for_tests.py"
 ]
 include = [
-    ".venv/Lib/site-packages/TCPLib/*",
+    "*/Lib/site-packages/TCPLib/*",
     "tests/test_*"
 ]
 
