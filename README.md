@@ -101,6 +101,7 @@ Install via pip:
 #### General
 - Minor improvements to thread safety
 - Evaluated code coverage and removed redundant code
+- Updated tests to improve code coverage
 
 ### What's New in Version 2.x
 
