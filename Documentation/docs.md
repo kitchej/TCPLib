@@ -1,5 +1,3 @@
-from src.TCPLib.tcp_client import TCPClient
-
 # TCPLib Public API Documentation
 
 ## Table of Contents
